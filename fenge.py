@@ -21,7 +21,6 @@ import queue
 
 import time
 import redis
-# import pickle
 
 r = redis.Redis(host='localhost', port=6379, password=None)
 
@@ -32,24 +31,6 @@ timesteps = torch.tensor([0], device=device)
 pe = pe.half()
 vae.vae = vae.vae.half()
 unet.model = unet.model.half()
-
-# def video2imgs(vid_path, save_path, ext = '.png',cut_frame = 10000000):
-#     cap = cv2.VideoCapture(vid_path)
-#     count = 0
-#     while True:
-#         if count > cut_frame:
-#             break
-#         ret, frame = cap.read()
-#         if ret:
-#             cv2.imwrite(f"{save_path}/{count:08d}.png", frame)
-#             count += 1
-#         else:
-#             break
-
-# def osmakedirs(path_list):
-#     for path in path_list:
-#         os.makedirs(path) if not os.path.exists(path) else None
-    
 
 @torch.no_grad() 
 class Avatar:
@@ -95,42 +76,12 @@ class Avatar:
         input_mask_list = glob.glob(os.path.join(self.mask_out_path, '*.[jpJP][pnPN]*[gG]'))
         input_mask_list = sorted(input_mask_list, key=lambda x: int(os.path.splitext(os.path.basename(x))[0]))
         self.mask_list_cycle = read_imgs(input_mask_list)
-    
-    
-    # def process_frames(self, 
-    #                    res_frame_queue,
-    #                    video_len,
-    #                    skip_save_images):
-    #     print(video_len)
-    #     while True:
-    #         if self.idx>=video_len-1:
-    #             break
-    #         try:
-    #             start = time.time()
-    #             res_frame = res_frame_queue.get(block=True, timeout=1)
-    #         except queue.Empty:
-    #             continue
-      
-    #         bbox = self.coord_list_cycle[self.idx%(len(self.coord_list_cycle))]
-    #         ori_frame = copy.deepcopy(self.frame_list_cycle[self.idx%(len(self.frame_list_cycle))])
-    #         x1, y1, x2, y2 = bbox
-    #         try:
-    #             res_frame = cv2.resize(res_frame.astype(np.uint8),(x2-x1,y2-y1))
-    #         except:
-    #             continue
-    #         mask = self.mask_list_cycle[self.idx%(len(self.mask_list_cycle))]
-    #         mask_crop_box = self.mask_coords_list_cycle[self.idx%(len(self.mask_coords_list_cycle))]
-    #         #combine_frame = get_image(ori_frame,res_frame,bbox)
-    #         combine_frame = get_image_blending(ori_frame,res_frame,bbox,mask,mask_crop_box)
 
-    #         if skip_save_images is False:
-    #             cv2.imwrite(f"{self.avatar_path}/tmp/{str(self.idx).zfill(8)}.png",combine_frame)
-    #         self.idx = self.idx + 1
     
     def process_frames2(self, 
                        res_frame_queue,
                        flag,
-                       video_len):
+                       video_len,audio_name):
         print(video_len)
         flag_batch = flag + self.batch_size
         while True:
@@ -152,69 +103,37 @@ class Avatar:
                 continue
             mask = self.mask_list_cycle[flag%(len(self.mask_list_cycle))]
             mask_crop_box = self.mask_coords_list_cycle[flag%(len(self.mask_coords_list_cycle))]
-            #combine_frame = get_image(ori_frame,res_frame,bbox)
             combine_frame = get_image_blending(ori_frame,res_frame,bbox,mask,mask_crop_box)
-
-            # if skip_save_images is False:
-            cv2.imwrite(f"{self.avatar_path}/tmp/{str(flag)}.png",combine_frame)
+            
+            # 是否需要保存图片
+            # cv2.imwrite(f"{self.avatar_path}/tmp/{str(flag)}.png",combine_frame)
+            r.set(audio_name + str(flag), pickle.dumps(combine_frame))
             flag = flag + 1
-
-    # def inference(self, 
-    #               audio_path, 
-    #               out_vid_name, 
-    #               fps,
-    #               skip_save_images):
-    #     os.makedirs(self.avatar_path+'/tmp',exist_ok =True)   
-    #     print("start inference")
-    #     ############################################## extract audio feature ##############################################
-    #     start_time = time.time()
-    #     whisper_feature = audio_processor.audio2feat(audio_path)
-    #     whisper_chunks = audio_processor.feature2chunks(feature_array=whisper_feature,fps=fps)
-    #     print(f"processing audio:{audio_path} costs {(time.time() - start_time) * 1000}ms")
-    #     ############################################## inference batch by batch ##############################################
-    #     video_num = len(whisper_chunks)   
-    #     res_frame_queue = queue.Queue()
-    #     self.idx = 0
-    #     # # Create a sub-thread and start it
-    #     process_thread = threading.Thread(target=self.process_frames, args=(res_frame_queue, video_num, skip_save_images))
-    #     process_thread.start()
-
-    #     gen = datagen(whisper_chunks,
-    #                   self.input_latent_list_cycle, 
-    #                   self.batch_size)
-    #     start_time = time.time()
-        
-    #     for i, (whisper_batch,latent_batch) in enumerate(tqdm(gen,total=int(np.ceil(float(video_num)/self.batch_size)))):
-    #         print(len(whisper_batch), len(latent_batch), "!!!!!!!!!")
-    #         print(whisper_batch, "PPPPPPPPP")
-    #         print(latent_batch, "LLLLLLLLLL")
-    #         audio_feature_batch = torch.from_numpy(whisper_batch)
-    #         audio_feature_batch = audio_feature_batch.to(device=unet.device,
-    #                                                      dtype=unet.model.dtype)
-    #         audio_feature_batch = pe(audio_feature_batch)
-    #         latent_batch = latent_batch.to(dtype=unet.model.dtype)
-
-    #         pred_latents = unet.model(latent_batch, 
-    #                                   timesteps, 
-    #                                   encoder_hidden_states=audio_feature_batch).sample
-    #         recon = vae.decode_latents(pred_latents)
-    #         for res_frame in recon:
-    #             res_frame_queue.put(res_frame)
-    #         break
-    #     # Close the queue and sub-thread after all tasks are completed
-    #     process_thread.join()
     
-    def infer(self, user_id):
-        video_num = int(r.get(user_id + '_all'))
+    def infer(self):
+        # video_num = int(r.get(user_id + '_all'))
         while True:
+            print(123)
+            queue_result = r.blpop('queue1', timeout=0)
+            if queue_result:
+                # 因为blpop返回的是一个包含键名和值的元组，所以取第二个元素为实际数据
+                element = str(queue_result[1].decode('utf-8')).split("_")
+                print(f"从队列中取出元素: {element}")
+                audio_name = element[2]
+                video_num = int(element[0])
+                flag = int(element[1])
+            else:
+                print("队列为空，继续等待...")
+                continue
+
             whisper_batch, latent_batch = [], []
 
-            flag = r.incr(user_id + 'counter', self.batch_size) - self.batch_size
+            # flag = r.incr(user_id + 'counter', self.batch_size) - self.batch_size
             print(flag, self.batch_size)
             for i in range(self.batch_size):
-                key_str = user_id + '_' + str(flag + i)
+                key_str = audio_name + '_' + str(flag + i)
                 if flag + i >= video_num:
-                    r.set(user_id + 'counter', 1000000)
+                    # r.set(user_id + 'counter', 1000000)
                     break
                 temp = r.get(key_str)
                 if temp is not None:
@@ -225,21 +144,19 @@ class Avatar:
                     latent = self.input_latent_list_cycle[idx]
                     latent_batch.append(latent)
                 else:
-                    r.set(user_id + 'counter', 1000000)
+                    # r.set(user_id + 'counter', 1000000)
                     break
             if len(whisper_batch) == 0:
-                time.sleep(10)
-                r.set(user_id + 'counter', 1000000)
-                break
+                # time.sleep(10)
+                # r.set(user_id + 'counter', 1000000)
+                continue
             print(len(whisper_batch), "??????")
             res_frame_queue = queue.Queue()
-            process_thread = threading.Thread(target=self.process_frames2, args=(res_frame_queue, flag, video_num))
+            process_thread = threading.Thread(target=self.process_frames2, args=(res_frame_queue, flag, video_num,audio_name))
             process_thread.start()
 
             whisper_batch = np.stack(whisper_batch)
             latent_batch = torch.cat(latent_batch, dim=0)
-            # print(whisper_batch, "###########")
-            # print(latent_batch, "$$$$$$$$$$$$$$$")
 
             audio_feature_batch = torch.from_numpy(whisper_batch)
             audio_feature_batch = audio_feature_batch.to(device=unet.device,
@@ -290,25 +207,25 @@ if __name__ == "__main__":
         batch_size = args.batch_size,
         preparation= False)
     
-    user_id = 'sang'
-    audio_url = "output_audio.wav"
+    # user_id = 'sang'
+    # audio_url = "output_audio.wav"
     
-    whisper_feature = audio_processor.audio2feat(audio_url)
-    whisper_chunks = audio_processor.feature2chunks(feature_array=whisper_feature,fps=args.fps)
+    # whisper_feature = audio_processor.audio2feat(audio_url)
+    # whisper_chunks = audio_processor.feature2chunks(feature_array=whisper_feature,fps=args.fps)
 
-    print(len(whisper_chunks))
+    # print(len(whisper_chunks))
 
-    whisper_batch = []
-    r.set(user_id + '_all', len(whisper_chunks))
-    for i, w in enumerate(whisper_chunks):
-        # if i == 0:
-        #     print(w)
-        serialized_w = pickle.dumps(w)
+    # whisper_batch = []
+    # r.set(user_id + '_all', len(whisper_chunks))
+    # for i, w in enumerate(whisper_chunks):
+    #     # if i == 0:
+    #     #     print(w)
+    #     serialized_w = pickle.dumps(w)
 
-        r.set(user_id + 'counter', 0)
-        r.set(user_id + '_' + str(i), serialized_w)
+    #     r.set(user_id + 'counter', 0)
+    #     r.set(user_id + '_' + str(i), serialized_w)
     
-    avatar.infer(user_id)
+    avatar.infer()
 
     # avatar.inference('data/audio/sun.wav', 
     #                         1, 
