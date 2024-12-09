@@ -105,6 +105,7 @@ class Avatar:
             mask_crop_box = self.mask_coords_list_cycle[flag%(len(self.mask_coords_list_cycle))]
             combine_frame = get_image_blending(ori_frame,res_frame,bbox,mask,mask_crop_box)
             
+            combine_frame = cv2.resize(combine_frame,(int(combine_frame.shape[1] / 3), int(combine_frame.shape[0] / 3)))
             # 是否需要保存图片
             # cv2.imwrite(f"{self.avatar_path}/tmp/{str(flag)}.png",combine_frame)
             r.set(audio_name + str(flag), pickle.dumps(combine_frame))
@@ -138,7 +139,7 @@ class Avatar:
                 temp = r.get(key_str)
                 if temp is not None:
                     print(key_str)
-                    # r.delete(key_str)
+                    r.delete(key_str)
                     whisper_batch.append(pickle.loads(temp))
                     idx = (i+flag)%len(self.input_latent_list_cycle)
                     latent = self.input_latent_list_cycle[idx]

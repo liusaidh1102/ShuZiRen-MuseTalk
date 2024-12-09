@@ -31,7 +31,7 @@ class VideoStreamTrack1(VideoStreamTrack):
     """
     一个自定义的视频流轨道，用于从摄像头读取视频帧并传递给WebRTC进行传输。
     """
-    def __init__(self, zbjname):
+    def __init__(self, zbjname, audio_track):
         super().__init__()
         self.zbjname = zbjname
         self.img_index = 0
@@ -39,8 +39,13 @@ class VideoStreamTrack1(VideoStreamTrack):
         self.audio_name = r.get(zbjname)
         if self.audio_name:
             self.audio_name = self.audio_name.decode('utf-8')
-        self.temp_frames = np.array(cv2.imread("0.png"))
+
+        image = cv2.imread("0.png")
+        image = cv2.resize(image, (int(image.shape[1] / 3), int(image.shape[0] / 3)))
+        self.temp_frames = np.array(image)
         self.temp_frames2 = self.temp_frames
+        self.bofang = False
+        self.audio_track = audio_track
 
     async def next_timestamp(self) :
         if hasattr(self, "_timestamp"):
@@ -76,6 +81,7 @@ class VideoStreamTrack1(VideoStreamTrack):
                 if self.img_index >= self.video_num - 1:
                     # self.audio_name = str(r.get(zbjname))
                     self.img_index = 0
+                    self.bofang = False
                     frame = self.temp_frames
 
                     #再次获取
@@ -90,22 +96,53 @@ class VideoStreamTrack1(VideoStreamTrack):
                         self.video_num = 0
                 else:
                     
-                    key = self.audio_name + str(self.img_index)
-                    # print(key, "******")
+                    # key = self.audio_name + str(self.img_index)
                     # while r.exists(key) is False:  #直到key存在
                     #     time.sleep(1)
-                    # print('6', key)
-                    # print(r.get(key), "&&&&&&&&&&&&")
-                    if r.exists(key):
-                        
-                        frame = pickle.loads(r.get(key))
-                        self.temp_frames2 = frame
-                        self.img_index += 1
-                    else:
-                        frame = self.temp_frames2
+                    # print(123123)
+                    # await asyncio.sleep(0.1)
                     
-                    # frame = pickle.loads(r.get(key))
+                    # 不会掉帧
+                    if self.audio_track.bofang:
+                        self.bofang = True
+                    if self.bofang:
+                        key = self.audio_name + str(self.img_index)
+                        val = r.get(key)
+                        if val:
+                            print(key, "********")
+                            r.delete(key)
+                            frame = pickle.loads(val)
+                            self.temp_frames2 = frame
+                        else:
+                            frame = self.temp_frames2
+                        
+                        self.img_index += 1
+
+                    # # 会掉帧
+                    # self.img_index = int(self.audio_track.current_frame / 320 / 2)
+                    # key = self.audio_name + str(self.img_index)
+                    
+                    # val = r.get(key)
+                    # if val:
+                    #     print(key, "********")
+                    #     self.temp_frames2 = frame
+                    #     r.delete(key)
+                    #     frame = pickle.loads(val)
+                    # else:
+                    #     frame = self.temp_frames2
+                        # ----------------------
+                    # key2 = self.audio_name + str(100) #阈值
+                    # if r.exists(key) and r.exists(key2):
+                        
+                    #     frame = pickle.loads(r.get(key))
+                    #     r.delete(key)
+                    #     self.temp_frames2 = frame
+                    #     self.img_index += 1
+                    # else:
+                    #     frame = self.temp_frames2
+                    
                     # self.img_index += 1
+                                        
 
             frame = VideoFrame.from_ndarray(frame, format="bgr24")
             
@@ -133,7 +170,7 @@ class AudioStreamTrack1(AudioStreamTrack):
         self.zbjname = zbjname
         fps = 50 # 20 ms per frame
         self.sample_rate = 16000
-        self.frame_size = int(self.sample_rate // fps)   #注意
+        self.frame_size = int(self.sample_rate // fps)  #注意
         # self.video_track = video_track
         # self.stream, self.sample_rate = sf.read("output_audio.wav")
         # print(f'[INFO]tts audio stream {self.sample_rate}: {self.stream.shape}')
@@ -151,6 +188,7 @@ class AudioStreamTrack1(AudioStreamTrack):
         # self.frame_size = int(chunk)
         self.stream = None
         self.total_frames = 0
+        self.video_num = 0
         self.audio_name = r.get(zbjname)
         if self.audio_name:
             self.audio_name = self.audio_name.decode('utf-8')
@@ -159,6 +197,7 @@ class AudioStreamTrack1(AudioStreamTrack):
         #     self.stream = pickle.loads(r.get(self.audio_name + "_audio"))
         #     self.total_frames = self.stream.shape[0]
         self.current_frame = 0
+        self.bofang = False
         
         
     async def recv(self):
@@ -170,6 +209,8 @@ class AudioStreamTrack1(AudioStreamTrack):
             #     # self.wav_file.rewind()
             #     self.current_frame = 0
             # print(self.video_track.img_index)
+            # self.current_frame = self.video_track.img_index * self.frame_size
+        
             flag_data = False
             row_data= None
             if self.audio_name is None:
@@ -178,12 +219,14 @@ class AudioStreamTrack1(AudioStreamTrack):
                 temp_audio_name = r.get(self.zbjname)
                 if temp_audio_name:
                     temp_audio_name = temp_audio_name.decode('utf-8')
-                print(temp_audio_name, "***************")
+                # print(temp_audio_name, "***************")
                 if temp_audio_name and temp_audio_name != self.audio_name:
                     self.audio_name = temp_audio_name #再次获取
-                    print(temp_audio_name, "**********&&&&&&")
+                    # print(temp_audio_name, "**********&&&&&&")
                     self.stream = pickle.loads(r.get(self.audio_name + "_audio"))
+                    r.delete(self.audio_name + "_audio")
                     self.total_frames = self.stream.shape[0]
+                    self.video_num = int(r.get(self.audio_name))
                 else:
                     self.total_frames = 0
             else:
@@ -191,6 +234,7 @@ class AudioStreamTrack1(AudioStreamTrack):
                 if self.current_frame >= self.total_frames:
                     # self.audio_name = str(r.get(zbjname))
                     self.current_frame = 0
+                    self.bofang = False
                     # frame = self.temp_frames
 
                     #再次获取
@@ -200,16 +244,20 @@ class AudioStreamTrack1(AudioStreamTrack):
                     if temp_audio_name and temp_audio_name != self.audio_name:
                         self.audio_name = temp_audio_name #再次获取
                         self.stream = pickle.loads(r.get(self.audio_name + "_audio"))
+                        r.delete(self.audio_name + "_audio")
                         self.total_frames = self.stream.shape[0]
+                        self.video_num = int(r.get(self.audio_name))
                     else:
                         self.total_frames = 0
                 else:
-                    flag_data = True
-                    row_data = self.stream[self.current_frame:self.current_frame+self.frame_size]
-                    print(len(row_data))
-                    if self.current_frame+self.frame_size > len(self.stream):
-                        flag_data = False
-                    self.current_frame += self.frame_size
+                    if self.bofang:
+                        flag_data = True
+                        row_data = self.stream[self.current_frame:self.current_frame+self.frame_size]
+                        # print(self.current_frame, self.current_frame+self.frame_size)
+                        # print(len(self.stream))
+                        if self.current_frame+self.frame_size > len(self.stream):
+                            flag_data = False
+                        self.current_frame += self.frame_size
 
             if hasattr(self, "_timestamp"):
                 self._timestamp += self.frame_size
@@ -222,7 +270,8 @@ class AudioStreamTrack1(AudioStreamTrack):
             # raw_data = self.stream[self.current_frame:self.current_frame+self.frame_size]
             frame = AudioFrame(format="s16", layout="mono", samples=self.frame_size)
             # self.current_frame += self.frame_size
-            if flag_data:
+            # and self.video_track.bofang
+            if flag_data and self.bofang:
                 # print("jinlaile$$$$$$$$$$$$$")
                 row_data = (row_data * 32767).astype(np.int16)
                 frame.planes[0].update(row_data.tobytes())
@@ -230,6 +279,10 @@ class AudioStreamTrack1(AudioStreamTrack):
             else:
                 silent_bytes = bytes([0x00] * (self.frame_size * 2))  # s16类型每个采样占2字节
                 frame.planes[0].update(silent_bytes)
+                
+                if self.audio_name and r.exists(self.audio_name + str(int(self.video_num // 1.2))):
+                    # print(self.audio_name + str(240))
+                    self.bofang = True
                 # print("按照特定格式处理为静音数据")
                 # frame.planes[0].update(None)
             #     print("$$$$$$$$$$$$$$$$$$$")
@@ -278,26 +331,28 @@ class HumanSRS:
             if pc.connectionState == "failed":
                 await pc.close()
 
-        video_track = VideoStreamTrack1(self.zbjname)
         audio_track = AudioStreamTrack1(self.zbjname)
-        pc.addTrack(video_track)
+
+        video_track = VideoStreamTrack1(self.zbjname, audio_track)
+        
         pc.addTrack(audio_track)
+        pc.addTrack(video_track)
 
         await self.create_offer_and_send(pc, srs_whip_url)
 
         # # 保持程序运行，持续推送视频流，这里简单使用一个循环，可以根据实际需求改进退出机制等
-        while True:
-            if self.stop:
-                pc.close()
-                break
-            await asyncio.sleep(1)
+        # while True:
+        #     if self.stop:
+        #         pc.close()
+        #         break
+        #     await asyncio.sleep(1)
 
     def run(self):
-        asyncio.run(self.main())
-        # loop = asyncio.new_event_loop()
-        # asyncio.set_event_loop(loop)
-        # loop.run_until_complete(self.main())
-        # loop.run_forever() 
+        # asyncio.run(self.main())
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self.main())
+        loop.run_forever() 
         
 
 

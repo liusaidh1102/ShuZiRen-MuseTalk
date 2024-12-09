@@ -92,8 +92,10 @@ def human():
     print(len(whisper_chunks))
 
     whisper_batch = []
-    r.set(audio_name, len(whisper_chunks)) #总帧数
-    print(audio_name, len(whisper_chunks), "**********")
+    # r.set(audio_name, len(whisper_chunks)) #总帧数
+    r.psetex(audio_name, 3000000, len(whisper_chunks)) #过期时间50分钟
+
+    # print(audio_name, len(whisper_chunks), "**********")
     for i, w in enumerate(whisper_chunks):
         serialized_w = pickle.dumps(w)
         # r.set(user_id + 'counter', 0)
@@ -101,7 +103,9 @@ def human():
     print('audio_name', audio_name)
     
 
-    r.set(zbjname, audio_name) #播放语音url
+    # r.set(zbjname, audio_name) #播放语音url
+    r.psetex(zbjname, 3000000, audio_name)
+    
     r.rpush('infer_queue', audio_name)
 
     return jsonify({'message': zbjname}), 200
