@@ -80,6 +80,8 @@ class VideoStreamTrack1(VideoStreamTrack):
                 # zbjname 为0无预测，为1有预测
                 if self.img_index >= self.video_num - 1:
                     # self.audio_name = str(r.get(zbjname))
+                    if self.video_num != 0:
+                        r.psetex(self.zbjname + "check", 360000, 1) # 不能超过6分钟没反应。
                     self.img_index = 0
                     self.bofang = False
                     frame = self.temp_frames
@@ -273,14 +275,20 @@ class AudioStreamTrack1(AudioStreamTrack):
             # and self.video_track.bofang
             if flag_data and self.bofang:
                 # print("jinlaile$$$$$$$$$$$$$")
+                # 假设row_data是音频数据数组
+                max_val = np.max(np.abs(row_data))
+                if max_val > 1.0:
+                    row_data = row_data / max_val
+                # 现在row_data的范围在-1.0到1.0之间，可以进行量化
                 row_data = (row_data * 32767).astype(np.int16)
+                # row_data = (row_data * 32767).astype(np.int16)
                 frame.planes[0].update(row_data.tobytes())
                 
             else:
                 silent_bytes = bytes([0x00] * (self.frame_size * 2))  # s16类型每个采样占2字节
                 frame.planes[0].update(silent_bytes)
                 
-                if self.audio_name and r.exists(self.audio_name + str(int(self.video_num // 1.2))):
+                if self.audio_name and r.exists(self.audio_name + str(int(self.video_num // 1.3))):
                     # print(self.audio_name + str(240))
                     self.bofang = True
                 # print("按照特定格式处理为静音数据")
@@ -341,18 +349,19 @@ class HumanSRS:
         await self.create_offer_and_send(pc, srs_whip_url)
 
         # # 保持程序运行，持续推送视频流，这里简单使用一个循环，可以根据实际需求改进退出机制等
-        # while True:
-        #     if self.stop:
-        #         pc.close()
-        #         break
-        #     await asyncio.sleep(1)
+        while True:
+            if self.stop or not r.exists(self.zbjname + 'check'):
+                print(self.zbjname + "直播间关闭了")
+                await pc.close()
+                break
+            await asyncio.sleep(1)
 
     def run(self):
-        # asyncio.run(self.main())
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.main())
-        loop.run_forever() 
+        asyncio.run(self.main())
+        # loop = asyncio.new_event_loop()
+        # asyncio.set_event_loop(loop)
+        # loop.run_until_complete(self.main())
+        # loop.run_forever() 
         
 
 

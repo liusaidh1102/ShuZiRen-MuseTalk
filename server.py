@@ -58,6 +58,7 @@ def zbj():
         return jsonify({'message': ""}), 200
     zbjname = username + "*" + str(uuid.uuid4())
     print(zbjname)
+    r.psetex(zbjname + "check", 360000, 1) #6分钟没有，自动关闭直播间
     
     human = HumanSRS(zbjname, "192.168.21.13")
     thread = threading.Thread(target=human.run)
@@ -91,7 +92,6 @@ def human():
 
     print(len(whisper_chunks))
 
-    whisper_batch = []
     # r.set(audio_name, len(whisper_chunks)) #总帧数
     r.psetex(audio_name, 3000000, len(whisper_chunks)) #过期时间50分钟
 
@@ -105,6 +105,7 @@ def human():
 
     # r.set(zbjname, audio_name) #播放语音url
     r.psetex(zbjname, 3000000, audio_name)
+    
     
     r.rpush('infer_queue', audio_name)
 
@@ -193,3 +194,15 @@ if __name__ == '__main__':
     thread = threading.Thread(target=diaodu)
     thread.start()
     app.run(debug=False,port=8181)
+
+
+
+# zbjname：username + "*" + str(uuid.uuid4())       key: 直播间名称，value: 语音key标识audio_name   通过直播间找到指定语音
+# audio_name  = zbjname + "-" + audio_url           key: zbjname + 语音url，value: 语音总帧数
+# stream_name  = audio_name + "_audio" key: audio_name + _audio，value: 推流语音数组
+# zbjname + "check"                                  key:zbjname + check, value: 1   直播间存活判断
+# audio_name + "_" + str(i)                        key: audio_name + _i, value: 预测语音chunk
+# audio_name + str(flag)                           key: audio_name + i value: 预测图片
+# infer_queue                                  key: infer_queue value:audio_name
+# queue*                                       key: queue* value: 总帧数_开始预测帧数_audio_name
+
