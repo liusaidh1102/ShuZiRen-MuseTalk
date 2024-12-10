@@ -3,8 +3,6 @@ import os
 from flask_cors import CORS, cross_origin
 from f5_tts.api import F5TTS
 import uuid
-import os
-import sys
 from srstl import HumanSRS
 import redis
 # import asyncio
@@ -15,6 +13,8 @@ import pickle
 import soundfile as sf
 import resampy
 import numpy as np
+from pydub import AudioSegment
+import time
 # sys.path.append(os.path.dirname(os.path.abspath(__file__)))
  
 app = Flask(__name__)
@@ -77,15 +77,28 @@ def human():
     # print(zbjname)
     
     # human = HumanSRS(zbjname, "192.168.21.13")
-    # thread = threading.Thread(target=human.run)
-    # thread.start()
+    thread = threading.Thread(target=audioHandle, args=(zbjname, audio_url))
+    thread.start()
+
+    # 发送带有 JSON 数据的 POST 请求
+    audio = AudioSegment.from_file(audio_url)
+    # 获取时长（以毫秒为单位）
+    duration_ms = len(audio)
+
+    # 将时长转换为秒
+    duration_seconds = duration_ms / 1000.0
+    
+    while not r.exists(zbjname + "ok"):
+        time.sleep(0.5)
+    
+    r.delete(zbjname + "ok")
+
+    return jsonify({'message': duration_seconds}), 200
+
+def audioHandle(zbjname, audio_url):
     audio_name = zbjname + "-" + audio_url
     stream_name = audio_name + "_audio"
     audio_chunk(audio_url, stream_name)
-
-    # self.audio_name + self.img_index
-
-    
 
     whisper_feature = audio_processor.audio2feat(audio_url)
     whisper_chunks = audio_processor.feature2chunks(feature_array=whisper_feature,fps=25)
@@ -101,15 +114,11 @@ def human():
         # r.set(user_id + 'counter', 0)
         r.set(audio_name + "_" + str(i), serialized_w) #音频chunk
     print('audio_name', audio_name)
-    
 
     # r.set(zbjname, audio_name) #播放语音url
     r.psetex(zbjname, 3000000, audio_name)
     
-    
     r.rpush('infer_queue', audio_name)
-
-    return jsonify({'message': zbjname}), 200
 
 def diaodu():
     queueList = ["queue1"]
@@ -193,7 +202,7 @@ def audio_chunk(audio_url, stream_name):
 if __name__ == '__main__':
     thread = threading.Thread(target=diaodu)
     thread.start()
-    app.run(debug=False,port=8181)
+    app.run(debug=False,port=8181,host="0.0.0.0")
 
 
 
