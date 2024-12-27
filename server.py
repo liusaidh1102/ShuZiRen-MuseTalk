@@ -18,11 +18,11 @@ import time
 # sys.path.append(os.path.dirname(os.path.abspath(__file__)))
  
 app = Flask(__name__)
-CORS(app)
-
+CORS(app,supports_credentials=True)
 # asr = ASRExecutor()
-f5tts = F5TTS()
-r = redis.Redis(host='localhost', port=6379, password=None)
+f5tts = F5TTS(ckpt_file="F5-TTS/ckpts/model_1200000.safetensors",
+        vocab_file="F5-TTS/ckpts/vocab.txt",local_path="F5-TTS/ckpts")
+r = redis.Redis(host='10.23.32.63', port=6389, password=None)
 audio_processor = Audio2Feature(model_path="./models/whisper/tiny.pt")
 
 # UPLOAD_FOLDER = 'uploads'
@@ -60,7 +60,7 @@ def zbj():
     print(zbjname)
     r.psetex(zbjname + "check", 360000, 1) #6分钟没有，自动关闭直播间
     
-    human = HumanSRS(zbjname, "192.168.21.13")
+    human = HumanSRS(zbjname, "srs.xiaozhu.com")
     thread = threading.Thread(target=human.run)
     thread.start()
 
@@ -71,7 +71,8 @@ def human():
     zbjname = request.args.get('zbjname')
     audio_url = request.args.get('audioUrl')
     if zbjname == None or zbjname == "":
-        return jsonify({'message': "直播间不可为空"}), 200
+        zbjname = 'hnkjxyms'
+        #return jsonify({'message': "直播间不可为空"}), 200
     if audio_url == None or audio_url == "":
         return jsonify({'message': "音频不可为空"}), 200
     # print(zbjname)
@@ -121,7 +122,7 @@ def audioHandle(zbjname, audio_url):
     r.rpush('infer_queue', audio_name)
 
 def diaodu():
-    queueList = ["queue1"]
+    queueList = ["queue1", "queue2", "queue3", "queue4", "queue5", "queue6", "queue7", "queue8"]
     while True:
         # 阻塞式地从队列右边弹出一个元素（如果队列为空会一直等待，直到有元素可弹出）
         result = r.blpop('infer_queue', timeout=0)
@@ -133,7 +134,7 @@ def diaodu():
             video_num = int(r.get(audio_name))
             print(f"总帧数: {video_num}")
             # r.set(audio_name + "infer", 0)
-            batch_size = 4
+            batch_size = 1
             flag = 0
             while flag <= video_num:
                 for i in range(len(queueList)):
@@ -198,7 +199,8 @@ def audio_chunk(audio_url, stream_name):
 #     response = requests.post(url, json=json_data)
 #     return jsonify({'message': "ok"}), 200
  
- 
+
+
 if __name__ == '__main__':
     thread = threading.Thread(target=diaodu)
     thread.start()

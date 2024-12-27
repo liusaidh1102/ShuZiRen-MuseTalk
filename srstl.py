@@ -14,7 +14,7 @@ import pickle
 import aiohttp
 import redis
 
-r = redis.Redis(host='localhost', port=6379, password=None)
+r = redis.Redis(host='10.23.32.63', port=6389, password=None)
 
 # 自定义视频轨道类，从摄像头获取视频帧并提供给WebRTC
 class VideoStreamTrack1(VideoStreamTrack):
@@ -32,11 +32,61 @@ class VideoStreamTrack1(VideoStreamTrack):
 
         image = cv2.imread("0.png")
         image = cv2.resize(image, (int(image.shape[1] / 3), int(image.shape[0] / 3)))
+        image = self.green_screen_keying(image, './bg.jpg')
         self.temp_frames = np.array(image)
         self.temp_frames2 = self.temp_frames
         self.bofang = False
         self.audio_track = audio_track
+    def green_screen_keying(self, image, background_path):
+        #image = cv2.resize(image, (int(image.shape[1] / 2), int(image.shape[0] / 2)))
+        # print(image)
+        background = cv2.imread(background_path)
+        background = cv2.resize(background, (int(background.shape[1] / 1.5), int(background.shape[0] / 1.5)))
+        #print(background.shape)
+        # t1 = time.time()
+        # bg = cv2.resize(background, (background.shape[1], background.shape[0]))
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        lower_green = np.array([36, 25, 25])
+        upper_green = np.array([70, 255, 255])
+        
+        # 创建掩码
+        mask = cv2.inRange(hsv_image, lower_green, upper_green)
+        # 反转掩码
+        mask_inv = cv2.bitwise_not(mask)
+        # 使用掩码提取前景，只保留非绿色的部分
+        fg = cv2.bitwise_and(image, image, mask=mask_inv)
+        # fg = cv2.resize(fg, (int(fg.shape[1] / 2), int(fg.shape[0] / 2)))
+        # cv2.imwrite("fg1.png", fg)
+        # 获取前景图片的尺寸
+        height, width, channels = fg.shape
 
+        #print(height, width, channels)
+
+        # 确定在背景图片上放置前景的起始坐标（这里是100, 100）
+        start_x = 450
+        start_y = 40
+
+        # 提取背景图片中要放置前景的区域
+        background_region = background[start_y:start_y + height, start_x:start_x + width]
+
+        # print(fg.dtype, background_region.dtype)
+
+        # # 假设fg是之前代码中的相关变量
+        # # 调整亮度和对比度，这里的alpha和beta值可以根据实际情况调整
+        # alpha = 1
+        # beta = 30
+        # fg = cv2.convertScaleAbs(fg, alpha=alpha, beta=beta)
+        background_masked = cv2.bitwise_and(background_region, background_region, mask=mask)
+
+        combined_region = cv2.bitwise_or(fg, background_masked)
+
+        # 将合并后的区域放回背景图片中
+        background[start_y:start_y + height, start_x:start_x + width] = combined_region
+
+        # 保存融合后的图片
+        # cv2.imwrite(result_path, background)
+
+        return background
     async def next_timestamp(self) :
         if hasattr(self, "_timestamp"):
             self._timestamp += int(1 / 25 * 90000)
@@ -127,7 +177,7 @@ class VideoStreamTrack1(VideoStreamTrack):
                     
                     # self.img_index += 1
                                         
-
+            #frame = self.green_screen_keying(frame, "./bg.jpg")
             frame = VideoFrame.from_ndarray(frame, format="bgr24")
             
             pts, time_base = await self.next_timestamp()
@@ -236,7 +286,7 @@ class AudioStreamTrack1(AudioStreamTrack):
                 silent_bytes = bytes([0x00] * (self.frame_size * 2))  # s16类型每个采样占2字节
                 frame.planes[0].update(silent_bytes)
                 
-                if self.audio_name and r.exists(self.audio_name + str(int(self.video_num // 1.3))):
+                if self.audio_name and r.exists(self.audio_name + str(1)):
                     r.set(self.zbjname + "ok", 1)
                     self.bofang = True
 
@@ -274,7 +324,7 @@ class HumanSRS:
 
 
     async def main(self):
-        srs_whip_url = f"http://{self.zbjip}:1985/rtc/v1/whip/?app=live&stream={self.zbjname}&eip={self.zbjip}"
+        srs_whip_url = f"http://{self.zbjip}/rtc/v1/whip/?app=live&stream={self.zbjname}&eip={self.zbjip}&secret=4adbc3be84cf4d39851cf2dd1f91f827"
         pc = RTCPeerConnection()
         @pc.on("connectionstatechange")
         async def on_connectionstatechange():
@@ -294,7 +344,7 @@ class HumanSRS:
 
         # # 保持程序运行，持续推送视频流，这里简单使用一个循环，可以根据实际需求改进退出机制等
         while True:
-            if self.stop or not r.exists(self.zbjname + 'check'):
+            if self.zbjname != 'hnkjxyms' and (self.stop or not r.exists(self.zbjname + 'check')):
                 print(self.zbjname + "直播间关闭了")
                 await pc.close()
                 break

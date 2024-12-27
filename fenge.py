@@ -22,7 +22,7 @@ import queue
 import time
 import redis
 
-r = redis.Redis(host='localhost', port=6379, password=None)
+r = redis.Redis(host='10.23.32.63', port=6389, password=None)
 
 # load model weights
 audio_processor, vae, unet, pe = load_all_model()
@@ -34,7 +34,7 @@ unet.model = unet.model.half()
 
 @torch.no_grad() 
 class Avatar:
-    def __init__(self, avatar_id, video_path, bbox_shift, batch_size, preparation):
+    def __init__(self, avatar_id, video_path, bbox_shift, batch_size,queue_str, preparation):
         self.avatar_id = avatar_id
         self.video_path = video_path
         self.bbox_shift = bbox_shift
@@ -53,6 +53,7 @@ class Avatar:
         }
         self.preparation = False
         self.batch_size = batch_size
+        self.queue_str = queue_str
         self.idx = 0
         self.init()
         
@@ -76,7 +77,56 @@ class Avatar:
         input_mask_list = glob.glob(os.path.join(self.mask_out_path, '*.[jpJP][pnPN]*[gG]'))
         input_mask_list = sorted(input_mask_list, key=lambda x: int(os.path.splitext(os.path.basename(x))[0]))
         self.mask_list_cycle = read_imgs(input_mask_list)
+    def green_screen_keying(self, image, background_path):
+        #image = cv2.resize(image, (int(image.shape[1] / 2), int(image.shape[0] / 2)))
+        # print(image)
+        background = cv2.imread(background_path)
+        background = cv2.resize(background, (int(background.shape[1] / 1.5), int(background.shape[0] / 1.5)))
+        #print(background.shape)
+        # t1 = time.time()
+        # bg = cv2.resize(background, (background.shape[1], background.shape[0]))
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        lower_green = np.array([36, 25, 25])
+        upper_green = np.array([70, 255, 255])
+        
+        # 创建掩码
+        mask = cv2.inRange(hsv_image, lower_green, upper_green)
+        # 反转掩码
+        mask_inv = cv2.bitwise_not(mask)
+        # 使用掩码提取前景，只保留非绿色的部分
+        fg = cv2.bitwise_and(image, image, mask=mask_inv)
+        # fg = cv2.resize(fg, (int(fg.shape[1] / 2), int(fg.shape[0] / 2)))
+        # cv2.imwrite("fg1.png", fg)
+        # 获取前景图片的尺寸
+        height, width, channels = fg.shape
 
+        #print(height, width, channels)
+
+        # 确定在背景图片上放置前景的起始坐标（这里是100, 100）
+        start_x = 450
+        start_y = 40
+
+        # 提取背景图片中要放置前景的区域
+        background_region = background[start_y:start_y + height, start_x:start_x + width]
+
+        # print(fg.dtype, background_region.dtype)
+
+        # # 假设fg是之前代码中的相关变量
+        # # 调整亮度和对比度，这里的alpha和beta值可以根据实际情况调整
+        # alpha = 1
+        # beta = 30
+        # fg = cv2.convertScaleAbs(fg, alpha=alpha, beta=beta)
+        background_masked = cv2.bitwise_and(background_region, background_region, mask=mask)
+
+        combined_region = cv2.bitwise_or(fg, background_masked)
+
+        # 将合并后的区域放回背景图片中
+        background[start_y:start_y + height, start_x:start_x + width] = combined_region
+
+        # 保存融合后的图片
+        # cv2.imwrite(result_path, background)
+
+        return background
     
     def process_frames2(self, 
                        res_frame_queue,
@@ -106,6 +156,7 @@ class Avatar:
             combine_frame = get_image_blending(ori_frame,res_frame,bbox,mask,mask_crop_box)
             
             combine_frame = cv2.resize(combine_frame,(int(combine_frame.shape[1] / 3), int(combine_frame.shape[0] / 3)))
+            combine_frame = self.green_screen_keying(combine_frame, "./bg.jpg")
             # 是否需要保存图片
             # cv2.imwrite(f"{self.avatar_path}/tmp/{str(flag)}.png",combine_frame)
             r.set(audio_name + str(flag), pickle.dumps(combine_frame))
@@ -115,7 +166,7 @@ class Avatar:
         # video_num = int(r.get(user_id + '_all'))
         while True:
             print(123)
-            queue_result = r.blpop('queue1', timeout=0)
+            queue_result = r.blpop(self.queue_str, timeout=0)
             if queue_result:
                 # 因为blpop返回的是一个包含键名和值的元组，所以取第二个元素为实际数据
                 element = str(queue_result[1].decode('utf-8')).split("_")
@@ -185,6 +236,10 @@ if __name__ == "__main__":
                         type=str, 
                         default="configs/inference/realtime.yaml",
     )
+    parser.add_argument("--queue",
+                        type=str,
+                        default="queue1",
+    )
     parser.add_argument("--fps", 
                         type=int, 
                         default=25,
@@ -202,10 +257,11 @@ if __name__ == "__main__":
     
 
     avatar = Avatar(
-        avatar_id = 'avator_6', 
+        avatar_id = 'avator_1', 
         video_path = 'data/video/output_video.mp4', 
         bbox_shift = -7, 
         batch_size = args.batch_size,
+        queue_str = args.queue,
         preparation= False)
     
     # user_id = 'sang'
