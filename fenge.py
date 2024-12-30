@@ -78,44 +78,22 @@ class Avatar:
         input_mask_list = sorted(input_mask_list, key=lambda x: int(os.path.splitext(os.path.basename(x))[0]))
         self.mask_list_cycle = read_imgs(input_mask_list)
     def green_screen_keying(self, image, background_path):
-        #image = cv2.resize(image, (int(image.shape[1] / 2), int(image.shape[0] / 2)))
-        # print(image)
         background = cv2.imread(background_path)
         background = cv2.resize(background, (int(background.shape[1] / 1.5), int(background.shape[0] / 1.5)))
-        #print(background.shape)
-        # t1 = time.time()
-        # bg = cv2.resize(background, (background.shape[1], background.shape[0]))
         hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         lower_green = np.array([36, 25, 25])
         upper_green = np.array([70, 255, 255])
-        
-        # 创建掩码
         mask = cv2.inRange(hsv_image, lower_green, upper_green)
         # 反转掩码
         mask_inv = cv2.bitwise_not(mask)
-        # 使用掩码提取前景，只保留非绿色的部分
         fg = cv2.bitwise_and(image, image, mask=mask_inv)
-        # fg = cv2.resize(fg, (int(fg.shape[1] / 2), int(fg.shape[0] / 2)))
-        # cv2.imwrite("fg1.png", fg)
-        # 获取前景图片的尺寸
         height, width, channels = fg.shape
 
-        #print(height, width, channels)
-
-        # 确定在背景图片上放置前景的起始坐标（这里是100, 100）
         start_x = 450
         start_y = 40
 
-        # 提取背景图片中要放置前景的区域
         background_region = background[start_y:start_y + height, start_x:start_x + width]
 
-        # print(fg.dtype, background_region.dtype)
-
-        # # 假设fg是之前代码中的相关变量
-        # # 调整亮度和对比度，这里的alpha和beta值可以根据实际情况调整
-        # alpha = 1
-        # beta = 30
-        # fg = cv2.convertScaleAbs(fg, alpha=alpha, beta=beta)
         background_masked = cv2.bitwise_and(background_region, background_region, mask=mask)
 
         combined_region = cv2.bitwise_or(fg, background_masked)
@@ -134,14 +112,16 @@ class Avatar:
                        video_len,audio_name):
         print(video_len)
         flag_batch = flag + self.batch_size
+        try_count = 1
         while True:
             print(flag, ")))))))")
-            if flag>=video_len-1 or flag >= flag_batch:
+            if flag>=video_len-1 or flag >= flag_batch or try_count > 5:
                 break
             try:
                 start = time.time()
                 res_frame = res_frame_queue.get(block=True, timeout=1)
             except queue.Empty:
+                try_count += 1
                 continue
       
             bbox = self.coord_list_cycle[flag%(len(self.coord_list_cycle))]
@@ -156,10 +136,11 @@ class Avatar:
             combine_frame = get_image_blending(ori_frame,res_frame,bbox,mask,mask_crop_box)
             
             combine_frame = cv2.resize(combine_frame,(int(combine_frame.shape[1] / 3), int(combine_frame.shape[0] / 3)))
-            combine_frame = self.green_screen_keying(combine_frame, "./bg.jpg")
+            #combine_frame = self.green_screen_keying(combine_frame, "./bg.jpg")
             # 是否需要保存图片
             # cv2.imwrite(f"{self.avatar_path}/tmp/{str(flag)}.png",combine_frame)
-            r.set(audio_name + str(flag), pickle.dumps(combine_frame))
+            # r.set(audio_name + str(flag), pickle.dumps(combine_frame))
+            r.psetex(audio_name + str(flag), 300000, pickle.dumps(combine_frame))
             flag = flag + 1
     
     def infer(self):

@@ -20,8 +20,8 @@ import time
 app = Flask(__name__)
 CORS(app,supports_credentials=True)
 # asr = ASRExecutor()
-f5tts = F5TTS(ckpt_file="F5-TTS/ckpts/model_1200000.safetensors",
-        vocab_file="F5-TTS/ckpts/vocab.txt",local_path="F5-TTS/ckpts")
+#f5tts = F5TTS(ckpt_file="F5-TTS/ckpts/model_1200000.safetensors",
+#        vocab_file="F5-TTS/ckpts/vocab.txt",local_path="F5-TTS/ckpts")
 r = redis.Redis(host='10.23.32.63', port=6389, password=None)
 audio_processor = Audio2Feature(model_path="./models/whisper/tiny.pt")
 
@@ -33,22 +33,49 @@ audio_processor = Audio2Feature(model_path="./models/whisper/tiny.pt")
 if not os.path.exists("tests"):
     os.makedirs("tests")
 
+app.config['ttsflag'] = 1
 @app.route('/tts')
 def index1():
     msg = request.args.get('msg')
     print(msg)
     if msg == None or msg == "":
         return jsonify({'message': ""}), 200
-    filename = "tests/" + str(uuid.uuid4()) + ".wav"
-    wav, sr, spect = f5tts.infer(
-        ref_file="output_audio.wav",
-        ref_text="大家好，非常荣幸能够作为今天的面试官与各位见面。",
-        gen_text=msg,
-        file_wave=filename,
-        seed=-1,  # random seed = -1
-    )
-    print("seed :", f5tts.seed)
+    key = str(uuid.uuid4())
+    filename = "tests/" + str(key) + ".wav"
+    r.rpush("ttsqueue" + str(app.config['ttsflag']), str(key) + "___" + str(msg))
+    app.config['ttsflag'] = app.config['ttsflag'] + 1
+    if app.config['ttsflag'] > 1:
+        app.config['ttsflag'] = 1
+    while not r.exists(key):
+        time.sleep(0.5)
+
+    r.delete(key)
+    #wav, sr, spect = f5tts.infer(
+    #    ref_file="output_audio.wav",
+    #    ref_text="大家好，非常荣幸能够作为今天的面试官与各位见面。",
+    #    gen_text=msg,
+    #    file_wave=filename,
+    #    seed=-1,  # random seed = -1
+    #)
+    #print("seed :", f5tts.seed)
     return jsonify({'message': filename}), 200
+
+@app.route('/asr')
+def asr():
+    msg = request.args.get('url')
+    print(msg)
+    if msg == None or msg == "":
+        return jsonify({'message': ""}), 200
+    #filename = "tests/" + str(uuid.uuid4()) + ".wav"
+    #wav, sr, spect = f5tts.infer(
+    #    ref_file="output_audio.wav",
+    #    ref_text="大家好，非常荣幸能够作为今天的面试官与各位见面。",
+    #    gen_text=msg,
+    #    file_wave=filename,
+    #    seed=-1,  # random seed = -1
+    #)
+    #print("seed :", f5tts.seed)
+    return jsonify({'message': "ceshi"}), 200
 
 @app.route('/create/zbj')
 def zbj():
@@ -122,7 +149,10 @@ def audioHandle(zbjname, audio_url):
     r.rpush('infer_queue', audio_name)
 
 def diaodu():
-    queueList = ["queue1", "queue2", "queue3", "queue4", "queue5", "queue6", "queue7", "queue8"]
+    queueList = []
+    for i in range(6):
+        queueList.append("queue" + str(i+1))
+    #queueList = ["queue1", "queue2", "queue3", "queue4", "queue5", "queue6", "queue7", "queue8"]
     while True:
         # 阻塞式地从队列右边弹出一个元素（如果队列为空会一直等待，直到有元素可弹出）
         result = r.blpop('infer_queue', timeout=0)
@@ -134,7 +164,7 @@ def diaodu():
             video_num = int(r.get(audio_name))
             print(f"总帧数: {video_num}")
             # r.set(audio_name + "infer", 0)
-            batch_size = 1
+            batch_size = 6
             flag = 0
             while flag <= video_num:
                 for i in range(len(queueList)):

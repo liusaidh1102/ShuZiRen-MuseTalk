@@ -13,6 +13,7 @@ import numpy as np
 import pickle
 import aiohttp
 import redis
+import copy
 
 r = redis.Redis(host='10.23.32.63', port=6389, password=None)
 
@@ -32,50 +33,32 @@ class VideoStreamTrack1(VideoStreamTrack):
 
         image = cv2.imread("0.png")
         image = cv2.resize(image, (int(image.shape[1] / 3), int(image.shape[0] / 3)))
-        image = self.green_screen_keying(image, './bg.jpg')
+        #image = self.green_screen_keying2(image)
         self.temp_frames = np.array(image)
         self.temp_frames2 = self.temp_frames
         self.bofang = False
         self.audio_track = audio_track
-    def green_screen_keying(self, image, background_path):
-        #image = cv2.resize(image, (int(image.shape[1] / 2), int(image.shape[0] / 2)))
-        # print(image)
-        background = cv2.imread(background_path)
-        background = cv2.resize(background, (int(background.shape[1] / 1.5), int(background.shape[0] / 1.5)))
-        #print(background.shape)
-        # t1 = time.time()
-        # bg = cv2.resize(background, (background.shape[1], background.shape[0]))
+      
+        self.background = cv2.imread('./bg.png')
+        self.background = cv2.resize(self.background, (int(self.background.shape[1] / 1.5), int(self.background.shape[0] / 1.5)))
+        image = self.green_screen_keying2(image)
+
+    def green_screen_keying2(self, image):
+        background = copy.deepcopy(self.background)
         hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         lower_green = np.array([36, 25, 25])
         upper_green = np.array([70, 255, 255])
-        
-        # 创建掩码
         mask = cv2.inRange(hsv_image, lower_green, upper_green)
         # 反转掩码
         mask_inv = cv2.bitwise_not(mask)
-        # 使用掩码提取前景，只保留非绿色的部分
         fg = cv2.bitwise_and(image, image, mask=mask_inv)
-        # fg = cv2.resize(fg, (int(fg.shape[1] / 2), int(fg.shape[0] / 2)))
-        # cv2.imwrite("fg1.png", fg)
-        # 获取前景图片的尺寸
         height, width, channels = fg.shape
 
-        #print(height, width, channels)
-
-        # 确定在背景图片上放置前景的起始坐标（这里是100, 100）
         start_x = 450
         start_y = 40
 
-        # 提取背景图片中要放置前景的区域
         background_region = background[start_y:start_y + height, start_x:start_x + width]
 
-        # print(fg.dtype, background_region.dtype)
-
-        # # 假设fg是之前代码中的相关变量
-        # # 调整亮度和对比度，这里的alpha和beta值可以根据实际情况调整
-        # alpha = 1
-        # beta = 30
-        # fg = cv2.convertScaleAbs(fg, alpha=alpha, beta=beta)
         background_masked = cv2.bitwise_and(background_region, background_region, mask=mask)
 
         combined_region = cv2.bitwise_or(fg, background_masked)
@@ -87,9 +70,10 @@ class VideoStreamTrack1(VideoStreamTrack):
         # cv2.imwrite(result_path, background)
 
         return background
+    
     async def next_timestamp(self) :
         if hasattr(self, "_timestamp"):
-            self._timestamp += int(1 / 25 * 90000)
+            self._timestamp += int(1 / 12 * 90000)
             wait = self._start + (self._timestamp / 90000) - time.time()
             await asyncio.sleep(wait)
         else:
@@ -140,7 +124,7 @@ class VideoStreamTrack1(VideoStreamTrack):
                     if self.audio_track.bofang:
                         self.bofang = True
                     if self.bofang:
-                        key = self.audio_name + str(self.img_index)
+                        key = self.audio_name + str(int(self.img_index))
                         val = r.get(key)
                         if val:
                             print(key, "********")
@@ -150,7 +134,7 @@ class VideoStreamTrack1(VideoStreamTrack):
                         else:
                             frame = self.temp_frames2
 
-                        self.img_index += 1
+                        self.img_index += 2.1
 
                     # 会掉帧
                     # self.img_index = int(self.audio_track.current_frame / 320 / 2)
@@ -177,7 +161,8 @@ class VideoStreamTrack1(VideoStreamTrack):
                     
                     # self.img_index += 1
                                         
-            #frame = self.green_screen_keying(frame, "./bg.jpg")
+            frame = self.green_screen_keying2(frame)
+            frame = cv2.resize(frame, (int(frame.shape[1] * 0.8), int(frame.shape[0] * 0.8)))
             frame = VideoFrame.from_ndarray(frame, format="bgr24")
             
             pts, time_base = await self.next_timestamp()
@@ -286,7 +271,7 @@ class AudioStreamTrack1(AudioStreamTrack):
                 silent_bytes = bytes([0x00] * (self.frame_size * 2))  # s16类型每个采样占2字节
                 frame.planes[0].update(silent_bytes)
                 
-                if self.audio_name and r.exists(self.audio_name + str(1)):
+                if self.audio_name and r.exists(self.audio_name + str(6)):
                     r.set(self.zbjname + "ok", 1)
                     self.bofang = True
 
