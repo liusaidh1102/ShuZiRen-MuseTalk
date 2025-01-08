@@ -67,13 +67,16 @@ class VideoStreamTrack1(VideoStreamTrack):
         background[start_y:start_y + height, start_x:start_x + width] = combined_region
 
         # 保存融合后的图片
-        # cv2.imwrite(result_path, background)
+        #cv2.imwrite("./test_pg1.png", background)
+        
+        #return combined_region
+        #print(self.background.shape[1], "**********")
+        return background[0:715, start_x:start_x + width]
+        #return background
 
-        return background
-    
     async def next_timestamp(self) :
         if hasattr(self, "_timestamp"):
-            self._timestamp += int(1 / 12 * 90000)
+            self._timestamp += int(1 / 25 * 90000)
             wait = self._start + (self._timestamp / 90000) - time.time()
             await asyncio.sleep(wait)
         else:
@@ -134,7 +137,7 @@ class VideoStreamTrack1(VideoStreamTrack):
                         else:
                             frame = self.temp_frames2
 
-                        self.img_index += 2.1
+                        self.img_index += 1
 
                     # 会掉帧
                     # self.img_index = int(self.audio_track.current_frame / 320 / 2)
@@ -272,7 +275,7 @@ class AudioStreamTrack1(AudioStreamTrack):
                 frame.planes[0].update(silent_bytes)
                 
                 if self.audio_name and r.exists(self.audio_name + str(6)):
-                    r.set(self.zbjname + "ok", 1)
+                    #r.set(self.zbjname + "ok", 1)
                     self.bofang = True
 
             frame.pts = self._timestamp

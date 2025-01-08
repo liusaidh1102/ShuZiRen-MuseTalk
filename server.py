@@ -46,7 +46,11 @@ def index1():
     app.config['ttsflag'] = app.config['ttsflag'] + 1
     if app.config['ttsflag'] > 1:
         app.config['ttsflag'] = 1
+    flag = 0
     while not r.exists(key):
+        if flag > 100:
+            break
+        flag = flag + 1
         time.sleep(0.5)
 
     r.delete(key)
@@ -66,28 +70,30 @@ def asr():
     print(msg)
     if msg == None or msg == "":
         return jsonify({'message': ""}), 200
-    #filename = "tests/" + str(uuid.uuid4()) + ".wav"
-    #wav, sr, spect = f5tts.infer(
-    #    ref_file="output_audio.wav",
-    #    ref_text="大家好，非常荣幸能够作为今天的面试官与各位见面。",
-    #    gen_text=msg,
-    #    file_wave=filename,
-    #    seed=-1,  # random seed = -1
-    #)
-    #print("seed :", f5tts.seed)
-    return jsonify({'message': "ceshi"}), 200
+    
+    r.rpush("asrqueue1", str(msg))
+    flag = 0
+    while not r.exists(msg):
+        if flag > 100:
+            break
+        flag = flag + 1
+        time.sleep(0.5)
+    text = r.get(msg).decode('utf-8')
+    r.delete(msg)
+    return jsonify({'message': text}), 200
 
 @app.route('/create/zbj')
 def zbj():
     username = request.args.get('username')
     print(username)
     if username == None or username == "":
-        return jsonify({'message': ""}), 200
+        username = "hnkjxy"
+        #return jsonify({'message': ""}), 200
     zbjname = username + "*" + str(uuid.uuid4())
     print(zbjname)
     r.psetex(zbjname + "check", 360000, 1) #6分钟没有，自动关闭直播间
     
-    human = HumanSRS(zbjname, "srs.xiaozhu.com")
+    human = HumanSRS(zbjname, "srs.xiaozhu.com:2022")
     thread = threading.Thread(target=human.run)
     thread.start()
 
@@ -115,13 +121,14 @@ def human():
 
     # 将时长转换为秒
     duration_seconds = duration_ms / 1000.0
+   
+   
+    #while not r.exists(zbjname + "ok"):
+    #    time.sleep(0.5)
     
-    while not r.exists(zbjname + "ok"):
-        time.sleep(0.5)
-    
-    r.delete(zbjname + "ok")
+    #r.delete(zbjname + "ok")
 
-    return jsonify({'message': duration_seconds}), 200
+    return jsonify({'message': duration_seconds + 1.5}), 200
 
 def audioHandle(zbjname, audio_url):
     audio_name = zbjname + "-" + audio_url
