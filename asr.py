@@ -1,6 +1,12 @@
 import redis
-from paddlespeech.cli.asr.infer import ASRExecutor
-asr = ASRExecutor()
+from funasr import AutoModel
+# paraformer-zh is a multi-functional asr model
+# use vad, punc, spk or not as you need
+model = AutoModel(model="paraformer-zh", model_revision="v2.0.4",
+                  vad_model="fsmn-vad", vad_model_revision="v2.0.4",
+                  punc_model="ct-punc-c", punc_model_revision="v2.0.4",
+                  # spk_model="cam++", spk_model_revision="v2.0.2",
+                  )
 r = redis.Redis(host='10.23.32.63', port=6389, password=None)
 
 while True:
@@ -16,8 +22,10 @@ while True:
     print('/project/resume/dist/apps/server/audios/' + element)
     result = ""
     try:
-        result = asr(model='conformer_talcs',codeswitch=True,
-        force_yes=False,lang='zh_en',audio_file='/project/resume/dist/apps/server/audios/' + element)
+        res = model.generate(input="/project/resume/dist/apps/server/audios/" + element,
+            batch_size_s=300,
+            hotword='魔搭')
+        result = res[0]["text"]
     except:
         print("错误")
     print(result)

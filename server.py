@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 import os
 from flask_cors import CORS, cross_origin
-from f5_tts.api import F5TTS
+#from f5_tts.api import F5TTS
 import uuid
 from srstl import HumanSRS
 import redis
@@ -48,7 +48,7 @@ def index1():
         app.config['ttsflag'] = 1
     flag = 0
     while not r.exists(key):
-        if flag > 100:
+        if flag > 20:
             break
         flag = flag + 1
         time.sleep(0.5)
@@ -74,7 +74,7 @@ def asr():
     r.rpush("asrqueue1", str(msg))
     flag = 0
     while not r.exists(msg):
-        if flag > 100:
+        if flag > 20:
             break
         flag = flag + 1
         time.sleep(0.5)
