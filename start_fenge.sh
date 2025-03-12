@@ -18,5 +18,5 @@ CUDA_VISIBLE_DEVICES=5 python fenge.py --queue="queue6" --batch_size=6 &
 #python test.py &
 CUDA_VISIBLE_DEVICES=6 python tts.py &
 python server.py &
-CUDA_VISIBLE_DEVICES=7 python asr_fenge.py &
+CUDA_VISIBLE_DEVICES=7 python asr.py &
 #CUDA_VISIBLE_DEVICES=4,5,6,7 python server.py &

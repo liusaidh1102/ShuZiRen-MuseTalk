@@ -82,6 +82,16 @@ def asr():
     r.delete(msg)
     return jsonify({'message': text}), 200
 
+@app.route('/bqfk')
+def bqfk():
+    msg = request.args.get('url') + "___" + request.args.get('msId') + "___" + request.args.get('index')
+    print(msg)
+    if msg == None or msg == "":
+        return jsonify({'message': ""}), 200
+
+    r.rpush("bqfkqueue1", str(msg))
+    return jsonify({'message': 'success'}), 200
+
 @app.route('/create/zbj')
 def zbj():
     username = request.args.get('username')
@@ -175,8 +185,8 @@ def diaodu():
             flag = 0
             while flag <= video_num:
                 for i in range(len(queueList)):
-                    print(queueList[i], str(video_num) + "_" + str(flag) + "_" + str(audio_name))
-                    r.rpush(queueList[i], str(video_num) + "_" + str(flag) + "_" + str(audio_name))
+                    print(queueList[i], str(video_num) + "___" + str(flag) + "___" + str(audio_name))
+                    r.rpush(queueList[i], str(video_num) + "___" + str(flag) + "___" + str(audio_name))
                     flag += batch_size
                 
         else:

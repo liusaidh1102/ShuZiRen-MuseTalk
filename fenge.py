@@ -150,7 +150,7 @@ class Avatar:
             queue_result = r.blpop(self.queue_str, timeout=0)
             if queue_result:
                 # 因为blpop返回的是一个包含键名和值的元组，所以取第二个元素为实际数据
-                element = str(queue_result[1].decode('utf-8')).split("_")
+                element = str(queue_result[1].decode('utf-8')).split("___")
                 print(f"从队列中取出元素: {element}")
                 audio_name = element[2]
                 video_num = int(element[0])
