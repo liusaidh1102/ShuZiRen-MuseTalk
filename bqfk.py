@@ -2,13 +2,13 @@ import os
 import redis
 import mysql.connector
 r = redis.Redis(host='10.23.32.63', port=6389, password=None)
-connection = mysql.connector.connect(
-        host="10.23.32.63",
-        user="root",
-        password="ruanzhu@mysql",
-        database="interview"
-)
-cursor = connection.cursor()
+#connection = mysql.connector.connect(
+#        host="10.23.32.63",
+#        user="root",
+#        password="ruanzhu@mysql",
+#        database="interview"
+#)
+#cursor = connection.cursor()
 
 import cv2
 import requests
@@ -20,6 +20,13 @@ DIFY_API_URL = "http://dify.xiaozhu.com/v1/chat-messages"
 
 # 视频抽帧函数
 def extract_frames(element, interval=5):
+    connection = mysql.connector.connect(
+        host="10.23.32.63",
+        user="root",
+        password="ruanzhu@mysql",
+        database="interview"
+    )
+    cursor = connection.cursor()
     data = element.split("___")
     cap = cv2.VideoCapture("/project/resume/dist/apps/server/audios/tests/" + data[0])
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -56,6 +63,9 @@ def extract_frames(element, interval=5):
         frame_count += 1
 
     cap.release()
+
+    cursor.close()
+    connection.close()
     # return extracted_frames
 
 
@@ -100,10 +110,10 @@ while True:
     else:
         print("队列为空，继续等待...")
         continue
-   # try:
-    extract_frames(element)
-   # except:
-    #    print("错误")
+    try:
+        extract_frames(element)
+    except:
+        print("错误")
     #print(result)
     #r.set(element, result)
 
