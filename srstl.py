@@ -17,6 +17,30 @@ import copy
 
 r = redis.Redis(host='10.23.32.63', port=6389, password=None)
 
+# 初始化一个空列表用于存储处理后的图片
+temp_frames_arr = []
+
+# 循环处理 500 张图片
+for i in range(2):
+    try:
+        # 图片文件名
+        #image_path = f"data/video/jingyin/{i}.png"
+        image_path = "0.png"
+        # 读取图片
+        image = cv2.imread(image_path)
+        if image is not None:
+            # 调整图片大小
+            resized_image = cv2.resize(image, (int(image.shape[1] / 3), int(image.shape[0] / 3)))
+            # 将处理后的图片添加到列表中
+            temp_frames_arr.append(resized_image)
+        else:
+            print(f"无法读取图片: {image_path}")
+    except Exception as e:
+        print(f"处理图片 {i}.png 时出错: {e}")
+
+# 将列表转换为 numpy 数组
+temp_frames_arr = np.array(temp_frames_arr)
+
 # 自定义视频轨道类，从摄像头获取视频帧并提供给WebRTC
 class VideoStreamTrack1(VideoStreamTrack):
     """
@@ -30,12 +54,14 @@ class VideoStreamTrack1(VideoStreamTrack):
         self.audio_name = r.get(zbjname)
         if self.audio_name:
             self.audio_name = self.audio_name.decode('utf-8')
-
+        
         image = cv2.imread("0.png")
         image = cv2.resize(image, (int(image.shape[1] / 3), int(image.shape[0] / 3)))
         #image = self.green_screen_keying2(image)
         self.temp_frames = np.array(image)
         self.temp_frames2 = self.temp_frames
+        self.temp_frames_arr = temp_frames_arr
+        self.arr_flag = 1
         self.bofang = False
         self.audio_track = audio_track
       
@@ -46,19 +72,22 @@ class VideoStreamTrack1(VideoStreamTrack):
     def green_screen_keying2(self, image):
         background = copy.deepcopy(self.background)
         hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        lower_green = np.array([36, 25, 25])
-        upper_green = np.array([70, 255, 255])
+        lower_green = np.array([35, 100, 50])
+        upper_green = np.array([85, 255, 255])
         mask = cv2.inRange(hsv_image, lower_green, upper_green)
         # 反转掩码
         mask_inv = cv2.bitwise_not(mask)
         fg = cv2.bitwise_and(image, image, mask=mask_inv)
-        height, width, channels = fg.shape
+        height,width, channels = fg.shape
 
         start_x = 450
         start_y = 40
 
-        background_region = background[start_y:start_y + height, start_x:start_x + width]
 
+        #print(start_y, start_y + height, background.shape, start_x, start_x + width, "eeeeeee")
+
+        background_region = background[start_y:start_y + height, start_x:start_x + width]
+        #background_region = background[start_x:start_x + width, start_y:start_y + height]
         background_masked = cv2.bitwise_and(background_region, background_region, mask=mask)
 
         combined_region = cv2.bitwise_or(fg, background_masked)
@@ -85,13 +114,15 @@ class VideoStreamTrack1(VideoStreamTrack):
         return self._timestamp, fractions.Fraction(1, 90000)
     
     async def recv(self):
+
         """
         重写recv方法，不断从摄像头读取视频帧，封装为帧对象返回。
         """
         try:
-            frame = self.temp_frames
+            frame = self.temp_frames_arr[self.arr_flag]
+
             if self.audio_name is None:
-                frame = self.temp_frames
+                frame = self.temp_frames_arr[self.arr_flag]
                 #再次获取
                 temp_audio_name = r.get(self.zbjname)
                 if temp_audio_name:
@@ -107,7 +138,7 @@ class VideoStreamTrack1(VideoStreamTrack):
                         r.psetex(self.zbjname + "check", 360000, 1) # 不能超过6分钟没反应。
                     self.img_index = 0
                     self.bofang = False
-                    frame = self.temp_frames
+                    frame = self.temp_frames_arr[self.arr_flag]
 
                     #再次获取
                     temp_audio_name = r.get(self.zbjname)
@@ -163,7 +194,10 @@ class VideoStreamTrack1(VideoStreamTrack):
                     #     frame = self.temp_frames2
                     
                     # self.img_index += 1
-                                        
+            self.arr_flag = (self.arr_flag + 1) % 500
+            self.arr_flag = 1
+            
+
             frame = self.green_screen_keying2(frame)
             frame = cv2.resize(frame, (int(frame.shape[1] * 0.8), int(frame.shape[0] * 0.8)))
             frame = VideoFrame.from_ndarray(frame, format="bgr24")
