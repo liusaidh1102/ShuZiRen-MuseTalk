@@ -9,6 +9,7 @@ r = redis.Redis(host='10.23.32.63', port=6389, password=None)
 #        database="interview"
 #)
 #cursor = connection.cursor()
+#r.delete('bqfkqueue1')
 
 import cv2
 import requests
@@ -19,7 +20,7 @@ DIFY_API_KEY = "app-Z46cJkhINJXfoT8tE003muIv"
 DIFY_API_URL = "http://dify.xiaozhu.com/v1/chat-messages"
 
 # 视频抽帧函数
-def extract_frames(element, interval=5):
+def extract_frames(element, interval=10):
     connection = mysql.connector.connect(
         host="10.23.32.63",
         user="root",
@@ -54,11 +55,12 @@ def extract_frames(element, interval=5):
             
             res = analyze_image("http://hnkjxyms.ruanzhuinfo.com/audios/tests/" + filename)
             print(res) #res['score'] res['summary']
-            sql = "INSERT INTO b_mianshi_bq (ms_id, `index`, content, sort, url) VALUES (%s, %s, %s, %s, %s)"
-            values = (data[1], data[2], str(res['summary']), str(res['score']), filename)
-            cursor.execute(sql, values)
-            connection.commit()
-            print(cursor.rowcount, "条记录插入成功。")
+            if "人物" not in str(res['summary']):
+                sql = "INSERT INTO b_mianshi_bq (ms_id, `index`, content, sort, url) VALUES (%s, %s, %s, %s, %s)"
+                values = (data[1], data[2], str(res['summary']), str(res['score']), filename)
+                cursor.execute(sql, values)
+                connection.commit()
+                print(cursor.rowcount, "条记录插入成功。")
             # extracted_frames.append(frame_filename)
         frame_count += 1
 

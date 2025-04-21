@@ -72,8 +72,8 @@ class VideoStreamTrack1(VideoStreamTrack):
     def green_screen_keying2(self, image):
         background = copy.deepcopy(self.background)
         hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        lower_green = np.array([35, 100, 50])
-        upper_green = np.array([85, 255, 255])
+        lower_green = np.array([36, 25, 25])
+        upper_green = np.array([70, 255, 255])
         mask = cv2.inRange(hsv_image, lower_green, upper_green)
         # 反转掩码
         mask_inv = cv2.bitwise_not(mask)
