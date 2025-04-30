@@ -2,6 +2,7 @@ import redis
 import requests
 import shutil
 import time
+from pydub import AudioSegment
 
 r = redis.Redis(host='10.23.32.63', port=6389, password=None)
 r.delete('hey_human')
@@ -32,9 +33,18 @@ while True:
     headers = {
         "Content-Type": "application/json"
     }
+    video_url = "/code/data/video_sucai/muted_video10.mp4"
+    audio = AudioSegment.from_file("/root/heygem_data/face2face/audio/" + key + "_" + index  + ".wav")
+    duration_ms = len(audio)
+    duration_seconds = duration_ms / 1000.0
+    if duration_seconds > 5 and duration_seconds < 10:
+        video_url = "/code/data/video_sucai/5_10s.mp4"
+    elif duration_seconds <= 5:
+        video_url = "/code/data/video_sucai/5s.mp4"
+
     data = {
         "audio_url": "/code/data/audio/" + key + "_" + index  + ".wav",
-        "video_url": "/code/data/muted_video.mp4",
+        "video_url": video_url,
         "code": key + "_" + index,
         "chaofen": 0,
         "watermark_switch": 0,
