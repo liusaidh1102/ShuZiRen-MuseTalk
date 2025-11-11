@@ -3,13 +3,13 @@ import os
 from flask_cors import CORS, cross_origin
 #from f5_tts.api import F5TTS
 import uuid
-from srstl import HumanSRS
+#from srstl import HumanSRS
 from hey_srs import HumanSRSv2
 import redis
 # import asyncio
 import threading
 # from musetalk.utils.utils import load_all_model
-from musetalk.whisper.audio2feature import Audio2Feature
+#from musetalk.whisper.audio2feature import Audio2Feature
 import pickle
 import soundfile as sf
 import resampy
@@ -27,7 +27,7 @@ CORS(app,supports_credentials=True)
 #f5tts = F5TTS(ckpt_file="F5-TTS/ckpts/model_1200000.safetensors",
 #        vocab_file="F5-TTS/ckpts/vocab.txt",local_path="F5-TTS/ckpts")
 r = redis.Redis(host='10.23.32.63', port=6389, password=None)
-audio_processor = Audio2Feature(model_path="./models/whisper/tiny.pt")
+#audio_processor = Audio2Feature(model_path="./models/whisper/tiny.pt")
 
 # UPLOAD_FOLDER = 'uploads'
 # if not os.path.exists(UPLOAD_FOLDER):
@@ -107,9 +107,9 @@ def zbj():
     print(zbjname)
     r.psetex(zbjname + "check", 360000, 1) #6分钟没有，自动关闭直播间
     
-    human = HumanSRS(zbjname, "srs.xiaozhu.com:2022")
-    thread = threading.Thread(target=human.run)
-    thread.start()
+    #human = HumanSRS(zbjname, "srs.xiaozhu.com:2022")
+    #thread = threading.Thread(target=human.run)
+    #thread.start()
 
     return jsonify({'message': zbjname}), 200
 
@@ -152,7 +152,7 @@ def gen_question(job, count):
     response = requests.post("http://dify.xiaozhu.com/v1/chat-messages", headers=headers, json=payload)
     if response.status_code == 200:
         result = response.json()
-        return json.loads(result['answer'])
+        return json.loads(result['answer'])['question']
 
     else:
         print(f"API 请求失败，状态码: {response.status_code}，错误信息: {response.text}")

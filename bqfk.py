@@ -20,7 +20,7 @@ DIFY_API_KEY = "app-Z46cJkhINJXfoT8tE003muIv"
 DIFY_API_URL = "http://dify.xiaozhu.com/v1/chat-messages"
 
 # 视频抽帧函数
-def extract_frames(element, interval=30):
+def extract_frames(element, interval=100):
     connection = mysql.connector.connect(
         host="10.23.32.63",
         user="root",
@@ -61,6 +61,7 @@ def extract_frames(element, interval=30):
                 cursor.execute(sql, values)
                 connection.commit()
                 print(cursor.rowcount, "条记录插入成功。")
+                break
             # extracted_frames.append(frame_filename)
         frame_count += 1
 
