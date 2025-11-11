@@ -1,0 +1,360 @@
+import asyncio
+import cv2
+from aiortc import RTCPeerConnection, RTCSessionDescription
+from aiortc.contrib.media import MediaStreamTrack
+from aiortc.mediastreams import VideoStreamTrack,AudioStreamTrack
+from aiohttp import ClientSession, ClientWebSocketResponse, WSMsgType
+from av import AudioFrame, VideoFrame
+import time
+import fractions
+import soundfile as sf
+import resampy
+import numpy as np
+import pickle
+import aiohttp
+import redis
+
+r = redis.Redis(host='10.23.32.63', port=6389, password=None)
+
+# 自定义视频轨道类，从摄像头获取视频帧并提供给WebRTC
+class VideoStreamTrack1(VideoStreamTrack):
+    """
+    一个自定义的视频流轨道，用于从摄像头读取视频帧并传递给WebRTC进行传输。
+    """
+    def __init__(self, zbjname, audio_track):
+        super().__init__()
+        self.zbjname = zbjname
+        self.img_index = 0
+        self.video_num = 0
+        self.audio_name = r.get(zbjname)
+        if self.audio_name:
+            self.audio_name = self.audio_name.decode('utf-8')
+
+        image = cv2.imread("0.png")
+        image = cv2.resize(image, (int(image.shape[1] / 3), int(image.shape[0] / 3)))
+        self.temp_frames = np.array(image)
+        self.temp_frames2 = self.temp_frames
+        self.bofang = False
+        self.audio_track = audio_track
+    def green_screen_keying(self, image, background_path):
+        #image = cv2.resize(image, (int(image.shape[1] / 2), int(image.shape[0] / 2)))
+        # print(image)
+        background = cv2.imread(background_path)
+        background = cv2.resize(background, (int(background.shape[1] / 1.5), int(background.shape[0] / 1.5)))
+        #print(background.shape)
+        # t1 = time.time()
+        # bg = cv2.resize(background, (background.shape[1], background.shape[0]))
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        lower_green = np.array([36, 25, 25])
+        upper_green = np.array([70, 255, 255])
+        
+        # 创建掩码
+        mask = cv2.inRange(hsv_image, lower_green, upper_green)
+        # 反转掩码
+        mask_inv = cv2.bitwise_not(mask)
+        # 使用掩码提取前景，只保留非绿色的部分
+        fg = cv2.bitwise_and(image, image, mask=mask_inv)
+        # fg = cv2.resize(fg, (int(fg.shape[1] / 2), int(fg.shape[0] / 2)))
+        # cv2.imwrite("fg1.png", fg)
+        # 获取前景图片的尺寸
+        height, width, channels = fg.shape
+
+        #print(height, width, channels)
+
+        # 确定在背景图片上放置前景的起始坐标（这里是100, 100）
+        start_x = 450
+        start_y = 40
+
+        # 提取背景图片中要放置前景的区域
+        background_region = background[start_y:start_y + height, start_x:start_x + width]
+
+        # print(fg.dtype, background_region.dtype)
+
+        # # 假设fg是之前代码中的相关变量
+        # # 调整亮度和对比度，这里的alpha和beta值可以根据实际情况调整
+        # alpha = 1
+        # beta = 30
+        # fg = cv2.convertScaleAbs(fg, alpha=alpha, beta=beta)
+        background_masked = cv2.bitwise_and(background_region, background_region, mask=mask)
+
+        combined_region = cv2.bitwise_or(fg, background_masked)
+
+        # 将合并后的区域放回背景图片中
+        background[start_y:start_y + height, start_x:start_x + width] = combined_region
+
+        # 保存融合后的图片
+        # cv2.imwrite(result_path, background)
+
+        return background
+    async def next_timestamp(self) :
+        if hasattr(self, "_timestamp"):
+            self._timestamp += int(1 / 25 * 90000)
+            wait = self._start + (self._timestamp / 90000) - time.time()
+            await asyncio.sleep(wait)
+        else:
+            self._start = time.time()
+            self._timestamp = 0
+        return self._timestamp, fractions.Fraction(1, 90000)
+    
+    async def recv(self):
+        """
+        重写recv方法，不断从摄像头读取视频帧，封装为帧对象返回。
+        """
+        try:
+            frame = self.temp_frames
+            if self.audio_name is None:
+                frame = self.temp_frames
+                #再次获取
+                temp_audio_name = r.get(self.zbjname)
+                if temp_audio_name:
+                    temp_audio_name = temp_audio_name.decode('utf-8')
+                if temp_audio_name and temp_audio_name != self.audio_name:
+                    self.audio_name = temp_audio_name #再次获取
+                    self.video_num = int(r.get(self.audio_name))
+                else:
+                    self.video_num = 0
+            else:
+                if self.img_index >= self.video_num - 1:
+                    if self.video_num != 0:
+                        r.psetex(self.zbjname + "check", 360000, 1) # 不能超过6分钟没反应。
+                    self.img_index = 0
+                    self.bofang = False
+                    frame = self.temp_frames
+
+                    #再次获取
+                    temp_audio_name = r.get(self.zbjname)
+                    if temp_audio_name:
+                        temp_audio_name = temp_audio_name.decode('utf-8')
+                    if temp_audio_name and temp_audio_name != self.audio_name:
+                        self.audio_name = temp_audio_name #再次获取
+                        self.video_num = int(r.get(self.audio_name))
+                    else:
+                        self.video_num = 0
+                else:
+                    # key = self.audio_name + str(self.img_index)
+                    # while r.exists(key) is False:  #直到key存在
+                    #     time.sleep(1)
+                    
+                    # 不会掉帧
+                    if self.audio_track.bofang:
+                        self.bofang = True
+                    if self.bofang:
+                        key = self.audio_name + str(self.img_index)
+                        val = r.get(key)
+                        if val:
+                            print(key, "********")
+                            r.delete(key)
+                            frame = pickle.loads(val)
+                            self.temp_frames2 = frame
+                        else:
+                            frame = self.temp_frames2
+
+                        self.img_index += 1
+
+                    # 会掉帧
+                    # self.img_index = int(self.audio_track.current_frame / 320 / 2)
+                    # key = self.audio_name + str(self.img_index)
+                    
+                    # val = r.get(key)
+                    # if val:
+                    #     print(key, "********")
+                    #     self.temp_frames2 = frame
+                    #     r.delete(key)
+                    #     frame = pickle.loads(val)
+                    # else:
+                    #     frame = self.temp_frames2
+                        # ----------------------
+                    
+                    # key2 = self.audio_name + str(100) #阈值
+                    # if r.exists(key) and r.exists(key2):
+                    #     frame = pickle.loads(r.get(key))
+                    #     r.delete(key)
+                    #     self.temp_frames2 = frame
+                    #     self.img_index += 1
+                    # else:
+                    #     frame = self.temp_frames2
+                    
+                    # self.img_index += 1
+                                        
+            frame = self.green_screen_keying(frame, "./bg.jpg")
+            frame = VideoFrame.from_ndarray(frame, format="bgr24")
+            
+            pts, time_base = await self.next_timestamp()
+            # 填充视频帧参数
+            frame.pts = pts
+            frame.time_base = time_base
+            
+            # 返回视频帧
+            return frame
+
+        except IOError as e:
+            print(f"摄像头读取出现异常，异常信息为: {e}")
+            # 这里可以添加一些尝试重新初始化摄像头等操作的逻辑
+        except Exception as e:
+            print(f"其他未知异常导致摄像头视频帧读取失败，异常信息为: {e}")
+
+# 自定义视频轨道类，从摄像头获取视频帧并提供给WebRTC
+class AudioStreamTrack1(AudioStreamTrack):
+    """
+    一个自定义的音频流轨道，用于从摄像头读取视频帧并传递给WebRTC进行传输。
+    """
+    def __init__(self, zbjname):
+        super().__init__()
+        self.zbjname = zbjname
+        fps = 50 # 20 ms per frame
+        self.sample_rate = 16000
+        self.frame_size = int(self.sample_rate // fps)  #注意
+
+        self.stream = None
+        self.total_frames = 0
+        self.video_num = 0
+        self.audio_name = r.get(zbjname)
+        if self.audio_name:
+            self.audio_name = self.audio_name.decode('utf-8')
+
+        self.current_frame = 0
+        self.bofang = False
+        
+        
+    async def recv(self):
+        try:
+
+            flag_data = False
+            row_data= None
+            if self.audio_name is None:
+
+                #再次获取
+                temp_audio_name = r.get(self.zbjname)
+                if temp_audio_name:
+                    temp_audio_name = temp_audio_name.decode('utf-8')
+                if temp_audio_name and temp_audio_name != self.audio_name:
+                    self.audio_name = temp_audio_name #再次获取
+                    self.stream = pickle.loads(r.get(self.audio_name + "_audio"))
+                    r.delete(self.audio_name + "_audio")
+                    self.total_frames = self.stream.shape[0]
+                    self.video_num = int(r.get(self.audio_name))
+                else:
+                    self.total_frames = 0
+            else:
+                # zbjname
+                if self.current_frame >= self.total_frames:
+                    self.current_frame = 0
+                    self.bofang = False
+
+                    #再次获取
+                    temp_audio_name = r.get(self.zbjname)
+                    if temp_audio_name:
+                        temp_audio_name = temp_audio_name.decode('utf-8')
+                    if temp_audio_name and temp_audio_name != self.audio_name:
+                        self.audio_name = temp_audio_name #再次获取
+                        self.stream = pickle.loads(r.get(self.audio_name + "_audio"))
+                        r.delete(self.audio_name + "_audio")
+                        self.total_frames = self.stream.shape[0]
+                        self.video_num = int(r.get(self.audio_name))
+                    else:
+                        self.total_frames = 0
+                else:
+                    if self.bofang:
+                        flag_data = True
+                        row_data = self.stream[self.current_frame:self.current_frame+self.frame_size]
+                        if self.current_frame+self.frame_size > len(self.stream):
+                            flag_data = False
+                        self.current_frame += self.frame_size
+
+            if hasattr(self, "_timestamp"):
+                self._timestamp += self.frame_size
+                wait = self._start + (self._timestamp / self.sample_rate) - time.time()
+                await asyncio.sleep(wait)
+            else:
+                self._start = time.time()
+                self._timestamp = 0
+            
+            frame = AudioFrame(format="s16", layout="mono", samples=self.frame_size)
+
+            if flag_data and self.bofang:
+                # 假设row_data是音频数据数组
+                max_val = np.max(np.abs(row_data))
+                if max_val > 1.0:
+                    row_data = row_data / max_val
+                # 现在row_data的范围在-1.0到1.0之间，可以进行量化
+                row_data = (row_data * 32767).astype(np.int16)
+                frame.planes[0].update(row_data.tobytes())
+                
+            else:
+                # 按照特定格式处理为静音数据
+                silent_bytes = bytes([0x00] * (self.frame_size * 2))  # s16类型每个采样占2字节
+                frame.planes[0].update(silent_bytes)
+                
+                if self.audio_name and r.exists(self.audio_name + str(3)):
+                    r.set(self.zbjname + "ok", 1)
+                    self.bofang = True
+
+            frame.pts = self._timestamp
+            frame.sample_rate = self.sample_rate
+            frame.time_base = fractions.Fraction(1, self.sample_rate)
+            return frame
+        except Exception as e:
+            print(f"其他未知异常导致帧读取失败，异常信息为: {e}")
+
+class HumanSRS:
+    def __init__(self, zbjname, zbjip):
+        self.zbjname = zbjname
+        self.stop = False
+        self.zbjip = zbjip
+
+    async def create_offer_and_send(self, pc, srs_whip_url):
+        """
+        创建WebRTC offer并发送到SRS服务器。
+
+        :param pc: RTCPeerConnection实例
+        :param srs_whip_url: SRS服务器的W-HIP URL
+        """
+        offer = await pc.createOffer()
+        await pc.setLocalDescription(offer)
+
+        
+        async with aiohttp.ClientSession() as session:
+            # 使用给定的WHIP地址
+            async with session.post(srs_whip_url, data=pc.localDescription.sdp) as response:
+                answer_data = await response.text()
+                print(answer_data, "*****")
+                answer = RTCSessionDescription(sdp=answer_data, type='answer')
+                await pc.setRemoteDescription(answer)
+
+
+    async def main(self):
+        srs_whip_url = f"http://{self.zbjip}/rtc/v1/whip/?app=live&stream={self.zbjname}&eip={self.zbjip}&secret=4adbc3be84cf4d39851cf2dd1f91f827"
+        pc = RTCPeerConnection()
+        @pc.on("connectionstatechange")
+        async def on_connectionstatechange():
+            print(srs_whip_url)
+            print("Connection state is %s" % pc.connectionState)
+            if pc.connectionState == "failed":
+                await pc.close()
+
+        audio_track = AudioStreamTrack1(self.zbjname)
+
+        video_track = VideoStreamTrack1(self.zbjname, audio_track)
+        
+        pc.addTrack(audio_track)
+        pc.addTrack(video_track)
+
+        await self.create_offer_and_send(pc, srs_whip_url)
+
+        # # 保持程序运行，持续推送视频流，这里简单使用一个循环，可以根据实际需求改进退出机制等
+        while True:
+            await asyncio.sleep(1)
+
+    def run(self):
+        asyncio.run(self.main())
+        # loop = asyncio.new_event_loop()
+        # asyncio.set_event_loop(loop)
+        # loop.run_until_complete(self.main())
+        # loop.run_forever() 
+
+# if __name__ == "__main__":
+#     # asyncio.run(main())
+#     loop = asyncio.new_event_loop()
+#     asyncio.set_event_loop(loop)
+#     loop.run_until_complete(main())
+#     loop.run_forever()  
