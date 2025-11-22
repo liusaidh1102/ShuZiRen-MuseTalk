@@ -7,7 +7,7 @@ model = AutoModel(model="paraformer-zh", model_revision="v2.0.4",
                   punc_model="ct-punc-c", punc_model_revision="v2.0.4",
                   # spk_model="cam++", spk_model_revision="v2.0.2",
                   )
-res = model.generate(input="/project/resume/dist/apps/server/audios/gj0l924fyxbvbts7papkzw2s.wav",
+res = model.generate(input=f"{model.model_path}/example/asr_example.wav",
             batch_size_s=300,
             hotword='魔搭')
 print(res[0]["text"])

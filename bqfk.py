@@ -1,7 +1,7 @@
 import os
 import redis
 import mysql.connector
-r = redis.Redis(host='10.23.32.63', port=6389, password=None)
+r = redis.Redis(host='localhost', port=6379, password='123456')
 #connection = mysql.connector.connect(
 #        host="10.23.32.63",
 #        user="root",
@@ -16,25 +16,25 @@ import requests
 import json
 
 # # Dify API 相关信息
-DIFY_API_KEY = "app-Z46cJkhINJXfoT8tE003muIv"
-DIFY_API_URL = "http://dify.xiaozhu.com/v1/chat-messages"
+DIFY_API_KEY = "app-CrEg7nvRYSnqGlIIHWfCntTx"
+DIFY_API_URL = "http://localhost:8001/v1/chat-messages"
 
 # 视频抽帧函数
 def extract_frames(element, interval=100):
     connection = mysql.connector.connect(
-        host="10.23.32.63",
+        host="localhost",
         user="root",
-        password="ruanzhu@mysql",
-        database="interview"
+        password="123456",
+        database="ai_interview"
     )
     cursor = connection.cursor()
     data = element.split("___")
-    cap = cv2.VideoCapture("/project/resume/dist/apps/server/audios/tests/" + data[0])
+    cap = cv2.VideoCapture("/home/user/project/human_ms/audios/" + data[0])
     fps = cap.get(cv2.CAP_PROP_FPS)
     print(fps)
     frame_interval = int(fps * interval)
     frame_count = 0
-    folder_path = f"/project/resume/dist/apps/server/audios/tests/{data[0].replace('.mp4', '')}"
+    folder_path = f"/home/user/project/human_ms/audios/{data[0].replace('.mp4', '')}"
     try:
         # 创建文件夹
         os.mkdir(folder_path)
@@ -50,10 +50,10 @@ def extract_frames(element, interval=100):
             break
         if frame_count % frame_interval == 0:
             filename = f"{data[0].replace('.mp4', '')}/{frame_count}.jpg"
-            frame_filename = f"/project/resume/dist/apps/server/audios/tests/{filename}"
+            frame_filename = f"/home/user/project/human_ms/audios/{filename}"
             cv2.imwrite(frame_filename, frame)
             
-            res = analyze_image("http://hnkjxyms.ruanzhuinfo.com/audios/tests/" + filename)
+            res = analyze_image("https://mianshi.hist.edu.cn/audios/" + filename)
             print(res) #res['score'] res['summary']
             if "人物" not in str(res['summary']):
                 sql = "INSERT INTO b_mianshi_bq (ms_id, `index`, content, sort, url) VALUES (%s, %s, %s, %s, %s)"

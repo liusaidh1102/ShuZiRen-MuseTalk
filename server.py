@@ -26,7 +26,7 @@ CORS(app,supports_credentials=True)
 # asr = ASRExecutor()
 #f5tts = F5TTS(ckpt_file="F5-TTS/ckpts/model_1200000.safetensors",
 #        vocab_file="F5-TTS/ckpts/vocab.txt",local_path="F5-TTS/ckpts")
-r = redis.Redis(host='10.23.32.63', port=6389, password=None)
+r = redis.Redis(host='localhost', port=6379, password='123456')
 #audio_processor = Audio2Feature(model_path="./models/whisper/tiny.pt")
 
 # UPLOAD_FOLDER = 'uploads'
@@ -45,6 +45,7 @@ def index1():
     if msg == None or msg == "":
         return jsonify({'message': ""}), 200
     key = str(uuid.uuid4())
+    # 文字转语音，并将语音存到test文件夹下
     filename = "tests/" + str(key) + ".wav"
     r.rpush("ttsqueue" + str(app.config['ttsflag']), str(key) + "___" + str(msg))
     app.config['ttsflag'] = app.config['ttsflag'] + 1
@@ -71,6 +72,7 @@ def index1():
 @app.route('/asr')
 def asr():
     msg = request.args.get('url')
+    msg = msg.replace("tests/", "")
     print(msg)
     if msg == None or msg == "":
         return jsonify({'message': ""}), 200
@@ -139,7 +141,7 @@ def zbjv2():
 
 def gen_question(job, count):
     headers = {
-        "Authorization": f"Bearer app-aybblG6pIi5oC30bUpx1EBnh",
+        "Authorization": f"Bearer app-kHDJw31r4XePPliSx993FvbW",
         "Content-Type": "application/json"
     }
     # 这里需要根据 Dify API 文档调整请求体
@@ -149,7 +151,7 @@ def gen_question(job, count):
         "response_mode": "blocking",
         "user": "python-gen-question",
     }
-    response = requests.post("http://dify.xiaozhu.com/v1/chat-messages", headers=headers, json=payload)
+    response = requests.post("http://localhost:8001/v1/chat-messages", headers=headers, json=payload)
     if response.status_code == 200:
         result = response.json()
         return json.loads(result['answer'])['question']

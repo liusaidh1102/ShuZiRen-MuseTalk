@@ -4,7 +4,7 @@ import shutil
 import time
 from pydub import AudioSegment
 
-r = redis.Redis(host='10.23.32.63', port=6389, password=None)
+r = redis.Redis(host='localhost', port=6379, password='123456')
 r.delete('hey_human')
 while True:
     queue_result = r.blpop('hey_human', timeout=0)
@@ -19,7 +19,7 @@ while True:
         print("队列为空，继续等待...")
         continue
     filename = "tests/" + key + "_" + index  + ".wav"
-    destination = "/root/heygem_data/face2face/audio/"
+    destination = "/root/duix_avatar_data/face2face/audio/"
     try:
         shutil.copy2(filename, destination)
         print(f"文件 {filename} 已成功复制到 {destination}")
@@ -34,7 +34,7 @@ while True:
         "Content-Type": "application/json"
     }
     video_url = "/code/data/video_sucai/muted_video10.mp4"
-    audio = AudioSegment.from_file("/root/heygem_data/face2face/audio/" + key + "_" + index  + ".wav")
+    audio = AudioSegment.from_file("/root/duix_avatar_data/face2face/audio/" + key + "_" + index  + ".wav")
     duration_ms = len(audio)
     duration_seconds = duration_ms / 1000.0
     if duration_seconds > 5 and duration_seconds < 10:
@@ -70,7 +70,7 @@ while True:
             msg = result.get("data", {}).get("msg")
             print("任务已完成。" if msg == "任务完成" else f"任务未完成，当前消息: {msg}")
             if msg == "任务完成":
-                shutil.copy2("/root/heygem_data/face2face/temp/"+key + "_" + index + "-r.mp4", "/home/sensoro/project/human_ms/tests/" +key + "_" + index + ".mp4")
+                shutil.copy2("/root/duix_avatar_data/face2face/temp/"+key + "_" + index + "-r.mp4", "/home/user/project/human_ms/tests/" +key + "_" + index + ".mp4")
                 r.psetex(key + index + "ok", 360000, 1)
                 break
         except (requests.RequestException, ValueError) as err:

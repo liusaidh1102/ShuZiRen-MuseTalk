@@ -7,7 +7,7 @@ model = AutoModel(model="paraformer-zh", model_revision="v2.0.4",
                   punc_model="ct-punc-c", punc_model_revision="v2.0.4",
                   # spk_model="cam++", spk_model_revision="v2.0.2",
                   )
-r = redis.Redis(host='10.23.32.63', port=6389, password=None)
+r = redis.Redis(host='localhost', port=6379, password='123456')
 
 while True:
     queue_result = r.blpop('asrqueue1', timeout=0)
@@ -19,10 +19,11 @@ while True:
     else:
         print("队列为空，继续等待...")
         continue
-    print('/project/resume/dist/apps/server/audios/' + element)
+    element = element.replace("tests/", "")
+    print('/home/user/project/human_ms/audios/' + element)
     result = ""
     try:
-        res = model.generate(input="/project/resume/dist/apps/server/audios/" + element,
+        res = model.generate(input="/home/user/project/human_ms/audios/" + element,
             batch_size_s=300,
             hotword='魔搭')
         result = res[0]["text"]

@@ -3,7 +3,7 @@ import redis
 
 f5tts = F5TTS(ckpt_file="F5-TTS/ckpts/model_1200000.safetensors",
         vocab_file="F5-TTS/ckpts/vocab.txt",local_path="F5-TTS/ckpts")
-r = redis.Redis(host='10.23.32.63', port=6389, password=None)
+r = redis.Redis(host='localhost', port=6379, password='123456')
 
 while True:
     queue_result = r.blpop('tts_text', timeout=0)
@@ -18,6 +18,7 @@ while True:
     else:
         print("队列为空，继续等待...")
         continue
+    # TTS 队列消费者生成
     filename = "tests/" + key + "_" + index  + ".wav"
     
     wav, sr, spect = f5tts.infer(

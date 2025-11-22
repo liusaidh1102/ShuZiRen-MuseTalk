@@ -1,0 +1,39 @@
+(base) root@ubuntu:/home/user/project/human_ms# python tts.py
+Traceback (most recent call last):
+  File "tts.py", line 1, in <module>
+    from f5_tts.api import F5TTS
+ModuleNotFoundError: No module named 'f5_tts'
+(base) root@ubuntu:/home/user/project/human_ms# conda activate human
+(human) root@ubuntu:/home/user/project/human_ms# python tts.py ^C
+(human) root@ubuntu:/home/user/project/human_ms# export
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
