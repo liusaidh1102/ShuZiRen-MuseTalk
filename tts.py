@@ -2,9 +2,9 @@ from f5_tts.api import F5TTS
 import redis
 
 f5tts = F5TTS(ckpt_file="F5-TTS/ckpts/model_1200000.safetensors",
-        vocab_file="F5-TTS/ckpts/vocab.txt")
+        vocab_file="F5-TTS/ckpts/vocab.txt",local_path="F5-TTS/ckpts")
 r = redis.Redis(host='localhost', port=6379, password='123456')
-# 真正生成wav文件的地方
+
 while True:
     queue_result = r.blpop('ttsqueue1', timeout=0)
     element = ""

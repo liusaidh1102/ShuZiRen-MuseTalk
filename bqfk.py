@@ -17,7 +17,7 @@ import json
 
 # # Dify API 相关信息
 DIFY_API_KEY = "app-CrEg7nvRYSnqGlIIHWfCntTx"
-DIFY_API_URL = "http://localhost:8001/v1/chat-messages"
+DIFY_API_URL = "http://localhost/v1/chat-messages"
 
 # 视频抽帧函数
 def extract_frames(element, interval=100):
@@ -29,12 +29,12 @@ def extract_frames(element, interval=100):
     )
     cursor = connection.cursor()
     data = element.split("___")
-    cap = cv2.VideoCapture("/home/user/project/human_ms/audios/" + data[0])
+    cap = cv2.VideoCapture("/tests/" + data[0])
     fps = cap.get(cv2.CAP_PROP_FPS)
     print(fps)
     frame_interval = int(fps * interval)
     frame_count = 0
-    folder_path = f"/home/user/project/human_ms/audios/{data[0].replace('.mp4', '')}"
+    folder_path = f"/tests/{data[0].replace('.mp4', '')}"
     try:
         # 创建文件夹
         os.mkdir(folder_path)
@@ -50,10 +50,10 @@ def extract_frames(element, interval=100):
             break
         if frame_count % frame_interval == 0:
             filename = f"{data[0].replace('.mp4', '')}/{frame_count}.jpg"
-            frame_filename = f"/home/user/project/human_ms/audios/{filename}"
+            frame_filename = f"/tests/{filename}"
             cv2.imwrite(frame_filename, frame)
-            
-            res = analyze_image("https://mianshi.hist.edu.cn/audios/" + filename)
+            # 图片地址
+            res = analyze_image("/tests/" + filename)
             print(res) #res['score'] res['summary']
             if "人物" not in str(res['summary']):
                 sql = "INSERT INTO b_mianshi_bq (ms_id, `index`, content, sort, url) VALUES (%s, %s, %s, %s, %s)"

@@ -20,10 +20,10 @@ while True:
         print("队列为空，继续等待...")
         continue
     element = element.replace("tests/", "")
-    print('/home/user/project/human_ms/audios/' + element)
+    print('/tests/' + element)
     result = ""
     try:
-        res = model.generate(input="/home/user/project/human_ms/audios/" + element,
+        res = model.generate(input="/tests/" + element,
             batch_size_s=300,
             hotword='魔搭')
         result = res[0]["text"]
