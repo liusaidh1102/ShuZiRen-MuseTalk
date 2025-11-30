@@ -16,7 +16,8 @@ import requests
 import json
 
 # # Dify API 相关信息
-DIFY_API_KEY = "app-CrEg7nvRYSnqGlIIHWfCntTx"
+# 表情动作反馈
+DIFY_API_KEY = "app-DVvH8G8QikNCqaIW5cq47oPu"
 DIFY_API_URL = "http://localhost/v1/chat-messages"
 
 # 视频抽帧函数
