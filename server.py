@@ -22,7 +22,7 @@ import json
 import shutil
 
 app = Flask(__name__)
-CORS(app,supports_credentials=True)
+CORS(app, resources={r"/tests/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
 # asr = ASRExecutor()
 #f5tts = F5TTS(ckpt_file="F5-TTS/ckpts/model_1200000.safetensors",
 #        vocab_file="F5-TTS/ckpts/vocab.txt",local_path="F5-TTS/ckpts")
@@ -36,6 +36,28 @@ r = redis.Redis(host='localhost', port=6379, password='123456')
 
 if not os.path.exists("tests"):
     os.makedirs("tests")
+
+@app.after_request
+def add_cors_headers(resp):
+    origin = request.headers.get('Origin')
+    if origin:
+        resp.headers['Access-Control-Allow-Origin'] = origin
+    else:
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Credentials'] = 'true'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET,HEAD,OPTIONS'
+    resp.headers['Access-Control-Allow-Headers'] = request.headers.get('Access-Control-Request-Headers', '*')
+    resp.headers['Access-Control-Expose-Headers'] = 'Content-Range, Range'
+    resp.headers['Vary'] = 'Origin'
+    return resp
+
+@app.route('/tests/<path:filename>', methods=['GET','HEAD','OPTIONS'])
+def serve_tests(filename):
+    if request.method == 'OPTIONS':
+        return ('', 204)
+    if filename.lower().endswith('.wav'):
+        print(f"[WAV] {request.method} {request.url} -> tests/{filename}")
+    return send_from_directory('tests', filename)
 
 app.config['ttsflag'] = 1
 @app.route('/tts')
@@ -141,7 +163,8 @@ def zbjv2():
 
 def gen_question(job, count):
     headers = {
-        "Authorization": f"Bearer app-kHDJw31r4XePPliSx993FvbW",
+        # 通过简历生成面试题apikey
+        "Authorization": f"Bearer app-aAhdvh4iUdV39pj5e6g0QFfY",
         "Content-Type": "application/json"
     }
     # 这里需要根据 Dify API 文档调整请求体
