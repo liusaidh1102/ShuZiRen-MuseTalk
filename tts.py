@@ -2,7 +2,7 @@ from f5_tts.api import F5TTS
 import redis
 
 f5tts = F5TTS(ckpt_file="F5-TTS/ckpts/model_1200000.safetensors",
-        vocab_file="F5-TTS/ckpts/vocab.txt",local_path="F5-TTS/ckpts")
+        vocab_file="F5-TTS/ckpts/vocab.txt")
 r = redis.Redis(host='localhost', port=6379, password='123456')
 
 while True:
@@ -18,6 +18,8 @@ while True:
         print("队列为空，继续等待...")
         continue
     filename = "tests/" + key + ".wav"
+
+    print(f"生成文件: {filename}")
     
     #wav, sr, spect = f5tts.infer(
     #    ref_file="data/video/output_audio.wav",
