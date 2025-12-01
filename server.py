@@ -174,7 +174,7 @@ def gen_question(job, count):
         "response_mode": "blocking",
         "user": "python-gen-question",
     }
-    response = requests.post("http://localhost/v1/chat-messages", headers=headers, json=payload)
+    response = requests.post("http://localhost:8001/v1/chat-messages", headers=headers, json=payload)
     if response.status_code == 200:
         result = response.json()
         return json.loads(result['answer'])['question']

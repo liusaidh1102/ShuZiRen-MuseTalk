@@ -18,44 +18,48 @@ import json
 # # Dify API 相关信息
 # 表情动作反馈
 DIFY_API_KEY = "app-DVvH8G8QikNCqaIW5cq47oPu"
-DIFY_API_URL = "http://localhost/v1/chat-messages"
+DIFY_API_URL = "http://localhost:8001/v1/chat-messages"
+BASE_URL = "http://localhost:4000/tests/"
+# 容器内部访问外部的地址
+REMOTE_BASE_URL = "http://host.docker.internal:4000/tests/"
+TESTS_DIR = r"D:\\idea-workspaces\\ai-mianshi\\human_ms\\tests"
 
-# 视频抽帧函数
+# 视频抽帧函数，抽成图片，并且交给dify进行ai分析
 def extract_frames(element, interval=100):
     connection = mysql.connector.connect(
         host="localhost",
         user="root",
         password="123456",
-        database="ai_interview"
+        database="shuziren-mianshi"
     )
     cursor = connection.cursor()
     data = element.split("___")
-    cap = cv2.VideoCapture("/tests/" + data[0])
+    cap = cv2.VideoCapture(BASE_URL + data[0])
     fps = cap.get(cv2.CAP_PROP_FPS)
     print(fps)
-    frame_interval = int(fps * interval)
+    if not fps or fps <= 0:
+        print(f"视频无法打开或FPS为0: {BASE_URL + data[0]}")
+        return
+    frame_interval = max(1, int(fps * interval))
     frame_count = 0
-    folder_path = f"/tests/{data[0].replace('.mp4', '')}"
-    try:
-        # 创建文件夹
-        os.mkdir(folder_path)
-        print(f"文件夹 {folder_path} 创建成功")
-    except FileExistsError:
-        print(f"文件夹 {folder_path} 已存在")
-    except FileNotFoundError:
-        print(f"指定的父文件夹不存在，无法创建 {folder_path}")
+    folder_path = os.path.join(TESTS_DIR, data[0].replace('.mp4', ''))
+    os.makedirs(folder_path, exist_ok=True)
+    print(f"抽帧保存目录: {folder_path}")
 
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
+        # 采用间隔抽帧
         if frame_count % frame_interval == 0:
             filename = f"{data[0].replace('.mp4', '')}/{frame_count}.jpg"
-            frame_filename = f"/tests/{filename}"
+            frame_filename = os.path.join(TESTS_DIR, filename)
+            print(f"抽帧图片地址：{frame_filename}")
+            # 图片写入本地磁盘
             cv2.imwrite(frame_filename, frame)
             # 图片地址
-            res = analyze_image("/tests/" + filename)
-            print(res) #res['score'] res['summary']
+            res = analyze_image(REMOTE_BASE_URL + filename)
+            print(f"分析结果：{res}") #res['score'] res['summary']
             if "人物" not in str(res['summary']):
                 sql = "INSERT INTO b_mianshi_bq (ms_id, `index`, content, sort, url) VALUES (%s, %s, %s, %s, %s)"
                 values = (data[1], data[2], str(res['summary']), str(res['score']), filename)
@@ -116,8 +120,10 @@ while True:
         continue
     try:
         extract_frames(element)
-    except:
-        print("错误")
+    except Exception as e:
+        print("错误", e)
+        import traceback
+        traceback.print_exc()
     #print(result)
     #r.set(element, result)
 
