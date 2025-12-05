@@ -57,9 +57,17 @@
 from f5_tts.api import F5TTS
 import redis
 
-f5tts = F5TTS(ckpt_file="F5-TTS/ckpts/model_1200000.safetensors",
-        vocab_file="F5-TTS/ckpts/vocab.txt",local_path="F5-TTS/ckpts")
-r = redis.Redis(host='localhost', port=6379, password='Hky123456.')
+'''
+使用低版本的f5-tts，适配local_path参数
+pip uninstall -y f5-tts
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn --timeout 120 f5-tts==0.3.4
+
+
+'''
+f5tts = F5TTS(ckpt_file=r"D:\idea-workspaces\ai-mianshi\human_ms\F5-TTS\ckpts\model_1200000.safetensors",
+        vocab_file=r"D:\idea-workspaces\ai-mianshi\human_ms\F5-TTS\ckpts\vocab.txt"
+        ,local_path=r"D:\idea-workspaces\ai-mianshi\human_ms\F5-TTS\ckpts")    
+r = redis.Redis(host='localhost', port=6379, password='123456')
 
 while True:
     queue_result = r.blpop('ttsqueue1', timeout=0)
@@ -88,6 +96,8 @@ while True:
         ref_text="大家好，非常荣幸能够作为今天的面试官与各位见面。",
         gen_text=msg,
         file_wave=filename,
+        # sample_rate=44100,
+        # num_channels=2,
         seed=-1,  # random seed = -1
     )
     r.set(key, 1)
