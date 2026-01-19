@@ -33,10 +33,11 @@ def extract_frames(element, interval=100):
         database="shuziren-mianshi"
     )
     cursor = connection.cursor()
+    # 视频地址，msId，index
     data = element.split("___")
     cap = cv2.VideoCapture(BASE_URL + data[0])
     fps = cap.get(cv2.CAP_PROP_FPS)
-    print(fps)
+    print(f"视频fps: {fps}")
     if not fps or fps <= 0:
         print(f"视频无法打开或FPS为0: {BASE_URL + data[0]}")
         return
@@ -60,7 +61,7 @@ def extract_frames(element, interval=100):
             # 图片地址
             res = analyze_image(REMOTE_BASE_URL + filename)
             print(f"分析结果：{res}") #res['score'] res['summary']
-            if "人物" not in str(res['summary']):
+            if "人物" in str(res['summary']):
                 sql = "INSERT INTO b_mianshi_bq (ms_id, `index`, content, sort, url) VALUES (%s, %s, %s, %s, %s)"
                 values = (data[1], data[2], str(res['summary']), str(res['score']), filename)
                 cursor.execute(sql, values)
