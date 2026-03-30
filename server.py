@@ -1,39 +1,19 @@
 from flask import Flask, request, jsonify, send_from_directory
 import os
-from flask_cors import CORS, cross_origin
-#from f5_tts.api import F5TTS
+from flask_cors import CORS
 import uuid
-#from srstl import HumanSRS
-from hey_srs import HumanSRSv2
 import redis
-# import asyncio
 import threading
-# from musetalk.utils.utils import load_all_model
-#from musetalk.whisper.audio2feature import Audio2Feature
 import pickle
 import soundfile as sf
 import resampy
 import numpy as np
-from pydub import AudioSegment
 import time
 import requests
 import json
-# sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-import shutil
-
 app = Flask(__name__)
 CORS(app, resources={r"/tests/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
-# asr = ASRExecutor()
-#f5tts = F5TTS(ckpt_file="F5-TTS/ckpts/model_1200000.safetensors",
-#        vocab_file="F5-TTS/ckpts/vocab.txt",local_path="F5-TTS/ckpts")
 r = redis.Redis(host='localhost', port=6379, password='123456')
-#audio_processor = Audio2Feature(model_path="./models/whisper/tiny.pt")
-
-# UPLOAD_FOLDER = 'uploads'
-# if not os.path.exists(UPLOAD_FOLDER):
-#     os.makedirs(UPLOAD_FOLDER)
-# app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
 if not os.path.exists("tests"):
     os.makedirs("tests")
 
@@ -120,47 +100,6 @@ def bqfk():
     r.rpush("bqfkqueue1", str(msg))
     return jsonify({'message': 'success'}), 200
 
-@app.route('/create/zbj')
-def zbj():
-    username = request.args.get('username')
-    print(username)
-    if username == None or username == "":
-        username = "hnkjxy"
-        #return jsonify({'message': ""}), 200
-    zbjname = username + "*" + str(uuid.uuid4())
-    print(zbjname)
-    r.psetex(zbjname + "check", 360000, 1) #6分钟没有，自动关闭直播间
-    
-    #human = HumanSRS(zbjname, "srs.xiaozhu.com:2022")
-    #thread = threading.Thread(target=human.run)
-    #thread.start()
-
-    return jsonify({'message': zbjname}), 200
-
-@app.route('/create/zbjv2')
-def zbjv2():
-    username = request.args.get('username')
-    job = request.args.get('job')
-    count = request.args.get('count')
-    print(username, job, count)
-    if username == None or username == "":
-        return jsonify({'message': ""}), 200
-    zbjname = username + "*" + str(uuid.uuid4())
-    print(zbjname)
-    r.psetex(zbjname + "check", 360000, 1) #6分钟没有，自动关闭直播间
-
-    #human = HumanSRSv2(zbjname, "srs.xiaozhu.com:2022")
-    #thread = threading.Thread(target=human.run)
-    #thread.start()
-
-    question = gen_question(job, count)
-    ttsflag = 0
-    for que in question:
-        r.rpush("tts_text", str(zbjname) + "___" + str(que) + "___" + str(ttsflag))
-        ttsflag = ttsflag + 1
-    print({'zbjname': zbjname, 'question': question})
-    return jsonify({'zbjname': zbjname, 'question': question}), 200
-
 def gen_question(job, count):
     headers = {
         # 通过简历生成面试题apikey
@@ -183,67 +122,6 @@ def gen_question(job, count):
         print(f"API 请求失败，状态码: {response.status_code}，错误信息: {response.text}")
 
 
-@app.route('/human')
-def human():
-    zbjname = request.args.get('zbjname')
-    audio_url = request.args.get('audioUrl')
-    if zbjname == None or zbjname == "":
-        zbjname = 'hnkjxyms'
-        #return jsonify({'message': "直播间不可为空"}), 200
-    if audio_url == None or audio_url == "":
-        return jsonify({'message': "音频不可为空"}), 200
-    # print(zbjname)
-    
-    # human = HumanSRS(zbjname, "192.168.21.13")
-    thread = threading.Thread(target=audioHandle, args=(zbjname, audio_url))
-    thread.start()
-
-    # 发送带有 JSON 数据的 POST 请求
-    audio = AudioSegment.from_file(audio_url)
-    # 获取时长（以毫秒为单位）
-    duration_ms = len(audio)
-
-    # 将时长转换为秒
-    duration_seconds = duration_ms / 1000.0
-   
-   
-    #while not r.exists(zbjname + "ok"):
-    #    time.sleep(0.5)
-    
-    #r.delete(zbjname + "ok")
-
-    return jsonify({'message': duration_seconds + 1.5}), 200
-
-@app.route('/humanv2')
-def humanv2():
-    zbjname = request.args.get('zbjname')
-    audio_url = request.args.get('audioUrl')
-    if zbjname == None or zbjname == "":
-        zbjname = 'hnkjxyms'
-        #return jsonify({'message': "直播间不可为空"}), 200
-    if audio_url == None or audio_url == "":
-        return jsonify({'message': "音频不可为空"}), 200
-    # 发送带有 JSON 数据的 POST 请求
-    if str(audio_url) not in ["99", "98", "97","96"]:
-        audio = AudioSegment.from_file('tests/' + zbjname + "_" + audio_url + ".wav")
-        while not r.exists(zbjname + audio_url + "ok"):
-            time.sleep(0.5)
-
-        r.delete(zbjname + audio_url + "ok")
-    else:
-        shutil.copy2("tests/" +  audio_url + ".mp4", 'tests/' + zbjname + "_" + audio_url + ".mp4")
-        audio = AudioSegment.from_file("tests/" + audio_url + ".wav")
-
-    # 获取时长（以毫秒为单位）
-    duration_ms = len(audio)
-
-    # 将时长转换为秒
-    duration_seconds = duration_ms / 1000.0
-    
-    r.psetex(zbjname + "_hey_flag", 3600000, audio_url)
-
-
-    return jsonify({'message': duration_seconds + 1.5}), 200
 
 def audioHandle(zbjname, audio_url):
     audio_name = zbjname + "-" + audio_url
@@ -316,41 +194,6 @@ def audio_chunk(audio_url, stream_name):
         stream = resampy.resample(x=stream, sr_orig=sample_rate, sr_new=sample_rate_flag)
 
     r.set(stream_name, pickle.dumps(stream))
-    # streamlen = stream.shape[0]
-    # print(streamlen)
-    # idx = 0
-    # flag = 0
-    # while streamlen >= chunk:  #and self.state==State.RUNNING
-    #     # self.put_audio_frame()
-    #     stream_temp = stream[idx:idx+chunk]
-    #     streamlen -= chunk
-    #     idx += chunk
-    #     # r.rpush('audio_queue', stream_temp.tobytes())
-    #     serialized_w = pickle.dumps(stream_temp)
-    #     # r.set(user_id + 'counter', 0)
-    #     r.set(user_id + '_' + str(flag), serialized_w)
-
-    #     flag += 1
-
-
-
-# @app.route('/human')
-# def human():
-# # 欢迎使用虚拟面试，我是你的面试官，希望接下来的面试顺利进行，让我们共同努力！
-#     path = request.args.get('path')
-#     print(path)
-#     if path == None or path == "":
-#         return jsonify({'message': ""}), 200
-#     url = 'http://localhost:8180/human'
-#     json_data = {
-#         'text': path,
-#         'type': 'speech'
-#     }
-    
-#     # 发送带有 JSON 数据的 POST 请求
-#     response = requests.post(url, json=json_data)
-#     return jsonify({'message': "ok"}), 200
- 
 
 
 if __name__ == '__main__':
@@ -358,14 +201,4 @@ if __name__ == '__main__':
     thread.start()
     app.run(debug=False,port=8181,host="0.0.0.0")
 
-
-
-# zbjname：username + "*" + str(uuid.uuid4())       key: 直播间名称，value: 语音key标识audio_name   通过直播间找到指定语音
-# audio_name  = zbjname + "-" + audio_url           key: zbjname + 语音url，value: 语音总帧数
-# stream_name  = audio_name + "_audio" key: audio_name + _audio，value: 推流语音数组
-# zbjname + "check"                                  key:zbjname + check, value: 1   直播间存活判断
-# audio_name + "_" + str(i)                        key: audio_name + _i, value: 预测语音chunk
-# audio_name + str(flag)                           key: audio_name + i value: 预测图片
-# infer_queue                                  key: infer_queue value:audio_name
-# queue*                                       key: queue* value: 总帧数_开始预测帧数_audio_name
 

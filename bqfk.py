@@ -1,29 +1,21 @@
 import os
 import redis
 import mysql.connector
-r = redis.Redis(host='localhost', port=6379, password='123456')
-#connection = mysql.connector.connect(
-#        host="10.23.32.63",
-#        user="root",
-#        password="ruanzhu@mysql",
-#        database="interview"
-#)
-#cursor = connection.cursor()
-#r.delete('bqfkqueue1')
-
 import cv2
 import requests
 import json
 
 # # Dify API 相关信息
 # 表情动作反馈
-DIFY_API_KEY = "app-DVvH8G8QikNCqaIW5cq47oPu"
-DIFY_API_URL = "http://localhost:8001/v1/chat-messages"
+DIFY_API_KEY = "app-zYVvuG0iSbAeubED4xnfHWiw"
+DIFY_API_URL = "https://api.dify.ai/v1/chat-messages"
+# 本地文件nginx代理
 BASE_URL = "http://localhost:4000/tests/"
 # 容器内部访问外部的地址
-REMOTE_BASE_URL = "http://host.docker.internal:4000/tests/"
-TESTS_DIR = r"D:\\idea-workspaces\\ai-mianshi\\human_ms\\tests"
+REMOTE_BASE_URL = "http://localhost:4000/tests/"
+TESTS_DIR = r"tests"
 
+r = redis.Redis(host='localhost', port=6379, password='123456')
 # 视频抽帧函数，抽成图片，并且交给dify进行ai分析
 def extract_frames(element, interval=100):
     connection = mysql.connector.connect(
@@ -35,23 +27,30 @@ def extract_frames(element, interval=100):
     cursor = connection.cursor()
     # 视频地址，msId，index
     data = element.split("___")
+    # OpenCV 读取视频 / 摄像头, 视频地址
     cap = cv2.VideoCapture(BASE_URL + data[0])
     fps = cap.get(cv2.CAP_PROP_FPS)
     print(f"视频fps: {fps}")
     if not fps or fps <= 0:
         print(f"视频无法打开或FPS为0: {BASE_URL + data[0]}")
         return
+    # fps：1s播放多少图片
+    # interval = 你想 多少秒抽一张图（比如 1 秒、2 秒）
+    # 目前是 100s 抽一张图片
     frame_interval = max(1, int(fps * interval))
+
+    print(f"每隔{interval} 秒抽一张图片")
     frame_count = 0
     folder_path = os.path.join(TESTS_DIR, data[0].replace('.mp4', ''))
     os.makedirs(folder_path, exist_ok=True)
     print(f"抽帧保存目录: {folder_path}")
 
     while cap.isOpened():
+        # ret成功读取到了，frame为当前帧
         ret, frame = cap.read()
         if not ret:
             break
-        # 采用间隔抽帧
+        # 采用间隔抽帧，第0帧一定会被抽出来
         if frame_count % frame_interval == 0:
             filename = f"{data[0].replace('.mp4', '')}/{frame_count}.jpg"
             frame_filename = os.path.join(TESTS_DIR, filename)
@@ -61,7 +60,7 @@ def extract_frames(element, interval=100):
             # 图片地址
             res = analyze_image(REMOTE_BASE_URL + filename)
             print(f"分析结果：{res}") #res['score'] res['summary']
-            if "人物" in str(res['summary']):
+            if "人物" not in str(res['summary']):
                 sql = "INSERT INTO b_mianshi_bq (ms_id, `index`, content, sort, url) VALUES (%s, %s, %s, %s, %s)"
                 values = (data[1], data[2], str(res['summary']), str(res['score']), filename)
                 cursor.execute(sql, values)
@@ -89,7 +88,7 @@ def analyze_image(image_path):
         # 这里需要根据 Dify API 文档调整请求体
     payload = {
         "inputs": {},
-        "query": "1",
+        "query": "请分析人物的表情动作",
         "response_mode": "blocking",
         "user": "python-biaoqingfankui",
         "files": [

@@ -10,7 +10,7 @@ model = AutoModel(model="paraformer-zh", model_revision="v2.0.4",
                   # spk_model="cam++", spk_model_revision="v2.0.2",
                   )
 r = redis.Redis(host='localhost', port=6379, password='123456')
-TESTS_DIR = r"D:\idea-workspaces\ai-mianshi\human_ms\tests"
+TESTS_DIR = r"tests"
 
 # 语音转文字，结果写回redis中去
 while True:
