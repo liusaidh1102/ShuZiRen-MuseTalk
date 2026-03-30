@@ -6,7 +6,7 @@ import requests
 import json
 
 # # Dify API 相关信息
-# 表情动作反馈
+# 表情动作反馈(改成自己的密钥，该密钥已经销毁)
 DIFY_API_KEY = "app-zYVvuG0iSbAeubED4xnfHWiw"
 DIFY_API_URL = "https://api.dify.ai/v1/chat-messages"
 # 本地文件nginx代理
