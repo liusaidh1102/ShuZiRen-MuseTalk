@@ -1,138 +1,223 @@
-# FFmpeg
-是一个开源的、跨平台的音视频处理工具和开发库，可以说是音视频领域的"瑞士军刀"。
+```markdown
+# Human MS - 虚拟人唇形同步系统
 
-## 🎯 主要用途
-- 视频/音频转码：在不同格式之间转换（如 MP4 → AVI, MP3 → WAV）
-- 视频剪辑/合并：剪切、拼接视频片段
-- 格式转换：支持几乎所有常见的音视频格式
-- 流媒体处理：直播推流、拉流、转码
-- 屏幕录制：录制桌面或摄像头画面
+基于 MuseTalk 和 F5-TTS 的实时高质量唇形同步虚拟人生成系统。
 
-## 🔧 组成部分
-- ffmpeg：命令行工具，用于转码、转换等操作
-- ffplay：简单的媒体播放器
-- ffprobe：媒体文件分析工具
-# 权重
-## 🎯 权重是什么？
-在AI领域，"权重"就是模型通过学习大量数据后得到的参数和知识。可以理解为：
+## 📖 项目简介
 
-📚 就像人类的大脑经验：通过学习获得的知识存储
+本项目是一个集成语音合成（TTS）、语音识别（ASR）和唇形同步的虚拟人生成系统，支持多语言音频驱动，可实时生成高质量的唇形同步视频（30fps+）。
 
-💾 模型的核心数据：包含了所有学到的特征和模式
+### 核心功能
 
-🔑 模型的"记忆"：训练成果的保存
+- **唇形同步**：基于潜空间修复技术的高质量唇形同步
+- **语音合成**：集成 F5-TTS 文本转语音引擎
+- **语音识别**：支持 ASR 语音转文字功能
+- **实时推理**：支持正常推理与实时推理两种模式
+- **多语言支持**：支持中英文等多语言音频驱动
+- **嘴型调节**：可调节嘴型开合度（bbox_shift）
 
-🛠️ 权重的作用：
-1. 避免重复训练
-    ```python
-    # 没有权重：需要从零开始训练（几天甚至几周）
-    model.train_from_scratch()
-    
-    # 有预训练权重：直接使用已有知识
-    model.load_weights("downloaded_weights.pth")
-    ```
-2. 提升性能
-    - 模型已经在大量数据上学习过
+### 应用场景
 
-    - 具有更好的特征提取能力
+- 虚拟人生成（配合 MuseV）
+- 视频配音
+- 直播互动
+- 数字人内容创作
 
-    - 收敛更快，效果更好
+## 🏗️ 项目结构
 
-3. 节省资源
-    ⏰ 节省时间：训练一个模型可能需要数天
-
-    💰 节省算力：不需要昂贵的GPU训练
-
-    📊 节省数据：不需要自己收集大量训练数据
-
-## 📁 在 MuseTalk 中的具体用途：
-
-- 人脸检测模型权重
-
-- 姿态估计模型权重
-
-- 口型同步模型权重
-
-- 视频生成模型权重
-
-## 🚀 为什么必须下载？
-```bash
-    # 如果不下载权重，运行时会报错：
-    ModelNotFoundError: Cannot find model weights
-    # 或者
-    MissingConfigError: Pre-trained weights required
 ```
-## 📊本项目中权重的下载位置
-自动下载：运行 app.py 时会执行 download_model() ，将各权重下载到 ./models 目录，见
-- 目录设定： ./app.py:33-35
-- HuggingFace 模型下载： ./app.py:47-71
-- Whisper tiny.pt 下载： ./app.py:73-84
-- Face-Parse 与 ResNet 权重： ./app.py:86-101
 
-# 模型的推理（生成）流程说明
-📤 简单来说：输入一张人物图片 + 一段音频 → 输出一个视频，视频中的人物会按照音频内容对口型说话
-## 🔧 两种推理模式：
-### 1. 正态推断（Normal Inference）
-    ✅ 高质量生成：效果更好，更自然
-    
-    ⏱️ 速度较慢：适合不要求实时性的场景
-    
-    🎬 适用场景：视频制作、内容创作、影视后期
-
-### 2. 实时推理（Realtime Inference）
-    ⚡ 快速生成：30fps以上，接近实时
-    
-    🎯 交互应用：适合直播、视频会议等
-    
-    🔄 预热机制：第一次处理需要准备，后续快速生成
-## 💡 技术原理
-```mermaid
-flowchart TD
-    A[人脸检测<br/>定位图片中的人脸] --> B[口型分析<br/>分析音频对应的口型变化]
-    B --> C[视频生成<br/>生成与音频同步的说话视频]
-    C --> D[后处理<br/>使用 FFmpeg 合成最终视频]
+human_ms/
+├── F5-TTS/                 # F5-TTS 语音合成子模块
+│   ├── src/f5_tts/        # F5-TTS 核心代码
+│   │   ├── model/         # 模型定义
+│   │   ├── infer/         # 推理脚本
+│   │   ├── train/         # 训练脚本
+│   │   └── api.py         # API 接口
+│   └── ckpts/             # 预训练权重
+├── data/                   # 数据目录
+│   ├── audio/             # 音频资源
+│   └── video/             # 视频资源
+├── audios/                 # 音频输出目录
+├── tests/                  # 测试文件目录
+├── server.py              # Web 服务器主程序
+├── tts.py                 # 异步 TTS 消费服务
+├── asr.py                 # ASR 语音识别服务
+├── bqfk.py                # 翻译服务
+└── hey_tts.py             # TTS 调用示例
 ```
-# 对外接口
+### 数据流向
 
-✅ 基础地址：`http://<服务器IP>:8181`
-✅ 接口列表：
-  - `GET /tts` 参数：`msg` 用途：文本转语音，返回 `{"message": "tests/<uuid>.wav"}`
-  - `GET /asr` 参数：`url`（如 `tests/<key>.wav`）用途：语音识别，返回 `{"message": "<text>"}`
-  - `GET /bqfk` 参数：`url`、`msId`、`index` 用途：视频抽帧与表情反馈任务，返回 `{"message":"success"}`
-  - `GET /create/zbj` 参数：`username` 用途：创建直播间标识，返回 `{"message":"<zbjname>"}`
-  - `GET /create/zbjv2` 参数：`username`、`job`、`count` 用途：创建直播间并生成题目，返回 `{"zbjname":"...", "question":[...]}`
-  - `GET /human` 参数：`zbjname`、`audioUrl` 用途：音频切片与推理调度，返回预计时长（秒）
-  - `GET /humanv2` 参数：`zbjname`、`audioUrl` 用途：触发推流播放合成视频，返回预计时长（秒）
-- 依赖：Redis `localhost:6379`，密码 `123456`；相关消费进程见 `hey_tts.py`、`asr.py`、`bqfk.py`、`hey_srs.py`
-- 演示页面（非 REST）：`http://<服务器IP>:7860/`
+- **输入素材**: `data/` 目录存放音频和视频输入素材
+- **临时文件**: `tests/` 目录存放临时生成的文件
+- **最终输出**: `results/` 目录存放输出的同步视频
+- **资源库**: `audios/` 目录存放音频资源
 
-# 文件存储路径
+## 🔧 环境要求
 
-✅ 测试与临时文件：`./tests/`
-  - `./tests/<uuid>.wav` 语音生成
-  - `./tests/<zbjname>_<index>.wav` 文本转语音队列产出
-  - `./tests/<zbjname>_<audioUrl>.mp4` 或 `./tests/<audioUrl>.mp4` 合成视频/推流素材
+### 基本配置
 
-✅ 推理输出与中间件：`./results/`
-  - 帧图：`./results/output/<input>_<audio>/%08d.png`
-  - 中间视频：`temp.mp4`
-  - 最终视频：`./results/output/<input>_<audio>.mp4`
-  - 输入视频重采样：`./results/input/outputxxx_<file>`
+- **Python**: >= 3.10
+- **CUDA**: 11.7
+- **GPU**: 推荐 NVIDIA V100 或更高性能显卡
 
-✅ 权重目录：`./models/`
-  - `./models/musetalk/musetalk.json`、`./models/musetalk/pytorch_model.bin`
-  - `./models/whisper/tiny.pt`
-  - `./models/sd-vae-ft-mse/config.json`、`./models/sd-vae-ft-mse/diffusion_pytorch_model.bin`
-  - `./models/dwpose/dw-ll_ucoco_384.pth`
-  - `./models/face-parse-bisent/79999_iter.pth`、`./models/face-parse-bisent/resnet18-5c106cde.pth`
+### 外部依赖
 
-✅ 数据示例：`./data/`
-  - `./data/video/output_audio.wav`
-  - `./data/audio/` 示例音频
+- **Redis**: localhost:6379 (密码：123456)
+- **FFmpeg**: 需设置 `FFMPEG_PATH` 环境变量
 
-✅ 资源库：`./audios/`
-  - `./audios/<file>.wav`、`./audios/<file>.mp4`
+### 模型权重
 
-# 注意事项
-- tts接口：接口返回的路径是异步生成的占位结果，实际文件由后台 TTS 消费进程生成，要想生成wav文件，要运行对应的tts.py文件 `python tts.py`
-- 使用的是redis的0号库，默认端口6379，密码123456
+系统会自动下载以下模型权重至 `./models` 目录：
+
+- musetalk - 唇形同步模型
+- whisper - 语音识别模型
+- dwpose - 姿态估计模型
+- face-parse - 人脸解析模型
+
+## 🚀 快速开始
+
+### 1. 安装依赖
+
+```
+bash
+# 克隆项目
+git clone <repository-url>
+cd human_ms
+
+# 安装 F5-TTS 子模块
+cd F5-TTS
+pip install -e .
+
+# 返回根目录并安装主项目依赖
+cd ..
+pip install -r requirements.txt
+```
+### 2. 配置环境变量
+
+设置 FFmpeg 路径（Windows 示例）：
+
+```
+powershell
+$env:FFMPEG_PATH = "C:\path\to\ffmpeg"
+```
+### 3. 启动 Redis
+
+确保 Redis 服务在本地运行：
+
+```
+bash
+redis-server --requirepass 123456
+```
+### 4. 运行服务
+
+#### 方式一：Web 服务
+
+```
+bash
+python server.py
+```
+#### 方式二：TTS 服务
+
+```
+bash
+python tts.py
+```
+#### 方式三：ASR 服务
+
+```
+bash
+python asr.py
+```
+## 📝 使用说明
+
+### 基本使用流程
+
+1. **准备素材**：将视频和音频文件放入 `data/video/` 和 `data/audio/` 目录
+2. **启动服务**：运行相应的服务脚本
+3. **生成视频**：通过 API 或命令行工具生成唇形同步视频
+4. **查看结果**：生成的视频保存在 `results/` 目录
+
+### API 接口
+
+服务启动后，可通过 HTTP API 进行调用：
+
+```
+bash
+# TTS 文本转语音
+curl -X POST http://localhost:8000/tts \
+  -H "Content-Type: application/json" \
+  -d '{"text": "你好世界"}'
+
+# ASR 语音转文字
+curl -X POST http://localhost:8000/asr \
+  -F "audio=@audio.wav"
+
+# 唇形同步视频生成
+curl -X POST http://localhost:8000/generate \
+  -F "video=@input.mp4" \
+  -F "audio=@output_audio.wav"
+```
+### 参数调节
+
+可通过 `bbox_shift` 参数调节嘴型开合度：
+
+- 正值：增大嘴型开合度
+- 负值：减小嘴型开合度
+- 默认值：0
+
+## 🛠️ 开发指南
+
+### 核心模块
+
+- **MuseTalk** (`musetalk/`): 唇形同步模型定义
+- **推理脚本** (`scripts/`): 
+  - `inference.py` - 标准推理
+  - `realtime_inference.py` - 实时推理
+- **F5-TTS** (`F5-TTS/src/f5_tts/`): 语音合成引擎
+
+### 自定义模型
+
+如需使用自定义模型权重，可将权重文件放入 `models/` 目录并在配置文件中指定路径。
+
+### 性能优化
+
+- 使用 GPU 推理可获得最佳性能
+- 调整 batch_size 以平衡速度和质量
+- 实时模式下可降低分辨率以提升帧率
+
+## 📋 常见问题
+
+### Q: 如何修改嘴型开合度？
+
+A: 在调用推理脚本时传入 `bbox_shift` 参数：
+
+```
+python
+bbox_shift = 5  # 增大嘴型开合度
+```
+### Q: 推理速度慢怎么办？
+
+A: 尝试以下方法：
+- 降低视频分辨率
+- 使用实时推理模式
+- 升级 GPU 硬件
+
+### Q: 如何切换不同的 TTS 声音？
+
+A: 修改 TTS 配置文件中的说话人 ID 或使用不同的参考音频。
+
+## 📄 许可证
+
+本项目基于相关开源协议发布，请查看各子项目的具体 LICENSE 文件。
+
+## 🙏 致谢
+
+- [MuseTalk](https://github.com/TMElyralab/MuseTalk) - 唇形同步基础模型
+- [F5-TTS](https://github.com/SWivid/F5-TTS) - 语音合成引擎
+- [Whisper](https://github.com/openai/whisper) - 语音识别
+
+## 📞 联系方式
+
+如有问题或建议，欢迎提交 Issue 或联系开发者。
+```
