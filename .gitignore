@@ -4,11 +4,9 @@
 .vscode/
 *.pyc
 .ipynb_checkpoints
-models
 results/
-data/audio/*.wav
-data/video/*.mp4
-F5-TTS/
-models.zip
-tests
+#data/audio/*.wav
+#data/video/*.mp4
+#F5-TTS/
+#tests
 config.py
