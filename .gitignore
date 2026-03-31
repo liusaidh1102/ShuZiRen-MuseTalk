@@ -11,3 +11,4 @@ data/video/*.mp4
 F5-TTS/
 models.zip
 tests
+config.py

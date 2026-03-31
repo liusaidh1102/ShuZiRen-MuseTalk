@@ -11,6 +11,7 @@ import numpy as np
 import time
 import requests
 import json
+from config import DIFY_API_KEY_GENERATE_QUESTION, DIFY_API_URL
 app = Flask(__name__)
 CORS(app, resources={r"/tests/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
 r = redis.Redis(host='localhost', port=6379, password='123456')
@@ -102,8 +103,8 @@ def bqfk():
 
 def gen_question(job, count):
     headers = {
-        # 通过简历生成面试题apikey
-        "Authorization": f"Bearer app-aAhdvh4iUdV39pj5e6g0QFfY",
+        # 通过简历生成面试题 apikey
+        "Authorization": f"Bearer {DIFY_API_KEY_GENERATE_QUESTION}",
         "Content-Type": "application/json"
     }
     # 这里需要根据 Dify API 文档调整请求体
@@ -113,7 +114,7 @@ def gen_question(job, count):
         "response_mode": "blocking",
         "user": "python-gen-question",
     }
-    response = requests.post("http://localhost:8001/v1/chat-messages", headers=headers, json=payload)
+    response = requests.post(DIFY_API_URL, headers=headers, json=payload)
     if response.status_code == 200:
         result = response.json()
         return json.loads(result['answer'])['question']

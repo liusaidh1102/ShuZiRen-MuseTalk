@@ -4,11 +4,12 @@ import mysql.connector
 import cv2
 import requests
 import json
+from config import DIFY_API_KEY_EXPRESSION_FEEDBACK, DIFY_API_URL
 
 # # Dify API 相关信息
-# 表情动作反馈(改成自己的密钥，该密钥已经销毁)
-DIFY_API_KEY = "app-zYVvuG0iSbAeubED4xnfHWiw"
-DIFY_API_URL = "https://api.dify.ai/v1/chat-messages"
+# 表情动作反馈 (改成自己的密钥，该密钥已经销毁)
+DIFY_API_KEY = DIFY_API_KEY_EXPRESSION_FEEDBACK
+DIFY_API_URL_LOCAL = DIFY_API_URL
 # 本地文件nginx代理
 BASE_URL = "http://localhost:4000/tests/"
 # 容器内部访问外部的地址
