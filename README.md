@@ -1,223 +1,132 @@
-```markdown
-# Human MS - 虚拟人唇形同步系统
-
-基于 MuseTalk 和 F5-TTS 的实时高质量唇形同步虚拟人生成系统。
+# F5-TTS 音视频AI处理工具
 
 ## 📖 项目简介
+**F5-TTS** 是一款基于预训练大模型的**音视频AI处理工具集**，集成了**文本转语音(TTS)**、**自动语音识别(ASR)**、**视频抽帧(BQFK)** 等核心能力，支持本地部署、API调用两种模式，可快速实现语音生成、语音转写、视频内容提取等AI音视频处理需求，是AI应用开发、音视频自动化处理的高效工具。
 
-本项目是一个集成语音合成（TTS）、语音识别（ASR）和唇形同步的虚拟人生成系统，支持多语言音频驱动，可实时生成高质量的唇形同步视频（30fps+）。
+---
 
-### 核心功能
+## 🎯 项目背景
+本项目为个人AI工程化实践项目，旨在解决音视频处理中的自动化、本地化需求，通过集成F5-TTS等开源大模型，打造一套开箱即用、可二次开发的AI音视频工具链，适用于AI配音、视频字幕生成、语音交互等场景。
 
-- **唇形同步**：基于潜空间修复技术的高质量唇形同步
-- **语音合成**：集成 F5-TTS 文本转语音引擎
-- **语音识别**：支持 ASR 语音转文字功能
-- **实时推理**：支持正常推理与实时推理两种模式
-- **多语言支持**：支持中英文等多语言音频驱动
-- **嘴型调节**：可调节嘴型开合度（bbox_shift）
+> ⚠️ 本项目仅用于技术学习与交流，所有模型均遵循对应开源协议，无任何商业用途。
 
-### 应用场景
+---
 
-- 虚拟人生成（配合 MuseV）
-- 视频配音
-- 直播互动
-- 数字人内容创作
+## 🛠️ 技术栈
+| 技术/工具 | 说明 |
+|-----------|------|
+| F5-TTS | 开源文本转语音大模型，支持高保真语音生成 |
+| Python 3.10+ | 核心开发语言 |
+| FastAPI | 后端服务框架，提供API接口服务 |
+| FFmpeg | 音视频处理工具，用于视频抽帧、音频格式转换 |
+| OpenAI Whisper | 自动语音识别(ASR)模型 |
+| PyTorch | 深度学习框架，用于模型推理 |
+| Pydantic | 配置管理与数据校验 |
 
-## 🏗️ 项目结构
+---
 
+## 📁 项目结构
+```
+F5-TTS/
+├── F5-TTS/                # F5-TTS核心模型目录（预训练模型、推理代码）
+├── data/                  # 数据目录（输入音频/视频、配置文件、示例数据）
+├── tests/                 # 单元测试目录（模型功能、接口测试用例）
+├── .gitignore             # Git忽略文件配置
+├── FFmpeg.md              # FFmpeg使用说明文档
+├── README.md              # 项目主文档（本文件）
+├── asr.py                 # 自动语音识别(ASR)核心脚本
+├── bqfk.py                # 视频抽帧(BQFK)核心脚本
+├── hey_tts.py             # TTS快速调用脚本
+├── server.py              # FastAPI服务启动脚本（API接口服务）
+├── tts.py                 # 文本转语音(TTS)核心脚本
+└── output_audio.wav       # 示例音频输出文件
 ```
 
-human_ms/
-├── F5-TTS/                 # F5-TTS 语音合成子模块
-│   ├── src/f5_tts/        # F5-TTS 核心代码
-│   │   ├── model/         # 模型定义
-│   │   ├── infer/         # 推理脚本
-│   │   ├── train/         # 训练脚本
-│   │   └── api.py         # API 接口
-│   └── ckpts/             # 预训练权重
-├── data/                   # 数据目录
-│   ├── audio/             # 音频资源
-│   └── video/             # 视频资源
-├── audios/                 # 音频输出目录
-├── tests/                  # 测试文件目录
-├── server.py              # Web 服务器主程序
-├── tts.py                 # 异步 TTS 消费服务
-├── asr.py                 # ASR 语音识别服务
-├── bqfk.py                # 翻译服务
-└── hey_tts.py             # TTS 调用示例
-```
-### 数据流向
+---
 
-- **输入素材**: `data/` 目录存放音频和视频输入素材
-- **临时文件**: `tests/` 目录存放临时生成的文件
-- **最终输出**: `results/` 目录存放输出的同步视频
-- **资源库**: `audios/` 目录存放音频资源
+## ✨ 核心功能
+### 1. 文本转语音(TTS)
+- 基于F5-TTS预训练模型，支持高保真、多风格语音生成
+- 支持自定义音色、语速、音量，适配不同场景需求
+- 支持批量文本转语音，适配长文本、多轮对话场景
+- 修复音频输出目录、视频抽帧逻辑等问题，优化音频清晰度
 
-## 🔧 环境要求
+### 2. 自动语音识别(ASR)
+- 集成Whisper模型，支持音频/视频语音转文字
+- 支持多语言识别，自动生成字幕文件
+- 适配本地/云端两种推理模式，灵活部署
 
-### 基本配置
+### 3. 视频抽帧(BQFK)
+- 基于FFmpeg实现视频批量抽帧，提取关键画面
+- 支持自定义抽帧频率、输出格式、分辨率
+- 适配AI视频分析、内容提取等场景
 
-- **Python**: >= 3.10
-- **CUDA**: 11.7
-- **GPU**: 推荐 NVIDIA V100 或更高性能显卡
+### 4. API服务化
+- 基于FastAPI搭建HTTP接口，支持远程调用TTS/ASR能力
+- 配置文件化管理API密钥，避免硬编码，提升安全性
+- 支持并发请求，适配高并发AI服务场景
 
-### 外部依赖
+---
 
-- **Redis**: localhost:6379 (密码：123456)
-- **FFmpeg**: 需设置 `FFMPEG_PATH` 环境变量
+## 🚀 快速启动
+### 环境要求
+- Python 3.10+
+- PyTorch 2.0+
+- FFmpeg（已安装并配置环境变量）
+- 8G+显存（本地模型推理推荐）
 
-### 模型权重
-
-系统会自动下载以下模型权重至 `./models` 目录：
-
-- musetalk - 唇形同步模型
-- whisper - 语音识别模型
-- dwpose - 姿态估计模型
-- face-parse - 人脸解析模型
-
-## 🚀 快速开始
-
-### 1. 安装依赖
-
-```
-bash
+### 安装依赖
+```bash
 # 克隆项目
-git clone <repository-url>
-cd human_ms
-
-# 安装 F5-TTS 子模块
+git clone https://github.com/liusaidh1102/F5-TTS.git
 cd F5-TTS
-pip install -e .
 
-# 返回根目录并安装主项目依赖
-cd ..
+# 安装依赖
 pip install -r requirements.txt
 ```
-### 2. 配置环境变量
 
-设置 FFmpeg 路径（Windows 示例）：
-
+### 核心脚本使用
+#### 1. 文本转语音(TTS)
+```bash
+# 直接运行TTS脚本
+python tts.py --text "你好，欢迎使用F5-TTS" --output output_audio.wav
 ```
-powershell
-$env:FFMPEG_PATH = "C:\path\to\ffmpeg"
-```
-### 3. 启动 Redis
 
-确保 Redis 服务在本地运行：
-
+#### 2. 自动语音识别(ASR)
+```bash
+# 运行ASR脚本，识别音频文件
+python asr.py --audio input_audio.wav --output transcript.txt
 ```
-bash
-redis-server --requirepass 123456
-```
-### 4. 运行服务
 
-#### 方式一：Web 服务
-
+#### 3. 视频抽帧(BQFK)
+```bash
+# 运行视频抽帧脚本
+python bqfk.py --video input_video.mp4 --output frames/ --fps 1
 ```
-bash
+
+#### 4. 启动API服务
+```bash
+# 启动FastAPI服务
 python server.py
+# 访问接口文档：http://localhost:8000/docs
 ```
-#### 方式二：TTS 服务
 
-```
-bash
-python tts.py
-```
-#### 方式三：ASR 服务
+---
 
-```
-bash
-python asr.py
-```
-## 📝 使用说明
+## 🧠 核心技术亮点
+### 1. 大模型工程化落地
+- 集成F5-TTS开源大模型，实现本地高保真语音生成
+- 优化模型推理逻辑，解决音频不清、输出异常等问题
+- 支持预训练模型加载，开箱即用，无需从零训练
 
-### 基本使用流程
+### 2. 配置化与安全性优化
+- 将硬编码的API密钥迁移至配置文件，提升项目安全性
+- 统一配置管理，支持多环境切换，适配不同部署场景
 
-1. **准备素材**：将视频和音频文件放入 `data/video/` 和 `data/audio/` 目录
-2. **启动服务**：运行相应的服务脚本
-3. **生成视频**：通过 API 或命令行工具生成唇形同步视频
-4. **查看结果**：生成的视频保存在 `results/` 目录
+### 3. 全链路音视频处理
+- 覆盖TTS、ASR、视频抽帧全链路音视频处理能力
+- 基于FFmpeg实现高效音视频处理，适配工业级场景
 
-### API 接口
-
-服务启动后，可通过 HTTP API 进行调用：
-
-```
-bash
-# TTS 文本转语音
-curl -X POST http://localhost:8000/tts \
-  -H "Content-Type: application/json" \
-  -d '{"text": "你好世界"}'
-
-# ASR 语音转文字
-curl -X POST http://localhost:8000/asr \
-  -F "audio=@audio.wav"
-
-# 唇形同步视频生成
-curl -X POST http://localhost:8000/generate \
-  -F "video=@input.mp4" \
-  -F "audio=@output_audio.wav"
-```
-### 参数调节
-
-可通过 `bbox_shift` 参数调节嘴型开合度：
-
-- 正值：增大嘴型开合度
-- 负值：减小嘴型开合度
-- 默认值：0
-
-## 🛠️ 开发指南
-
-### 核心模块
-
-- **MuseTalk** (`musetalk/`): 唇形同步模型定义
-- **推理脚本** (`scripts/`): 
-  - `inference.py` - 标准推理
-  - `realtime_inference.py` - 实时推理
-- **F5-TTS** (`F5-TTS/src/f5_tts/`): 语音合成引擎
-
-### 自定义模型
-
-如需使用自定义模型权重，可将权重文件放入 `models/` 目录并在配置文件中指定路径。
-
-### 性能优化
-
-- 使用 GPU 推理可获得最佳性能
-- 调整 batch_size 以平衡速度和质量
-- 实时模式下可降低分辨率以提升帧率
-
-## 📋 常见问题
-
-### Q: 如何修改嘴型开合度？
-
-A: 在调用推理脚本时传入 `bbox_shift` 参数：
-
-```
-python
-bbox_shift = 5  # 增大嘴型开合度
-```
-### Q: 推理速度慢怎么办？
-
-A: 尝试以下方法：
-- 降低视频分辨率
-- 使用实时推理模式
-- 升级 GPU 硬件
-
-### Q: 如何切换不同的 TTS 声音？
-
-A: 修改 TTS 配置文件中的说话人 ID 或使用不同的参考音频。
-
-## 📄 许可证
-
-本项目基于相关开源协议发布，请查看各子项目的具体 LICENSE 文件。
-
-## 🙏 致谢
-
-- [MuseTalk](https://github.com/TMElyralab/MuseTalk) - 唇形同步基础模型
-- [F5-TTS](https://github.com/SWivid/F5-TTS) - 语音合成引擎
-- [Whisper](https://github.com/openai/whisper) - 语音识别
-
-## 📞 联系方式
-
-如有问题或建议，欢迎提交 Issue 或联系开发者。
-```
+### 4. 服务化与可扩展性
+- FastAPI封装API接口，支持远程调用、二次开发
+- 模块化设计，可快速扩展新的AI能力（如语音克隆、视频生成）
