@@ -1,223 +1,100 @@
-```markdown
-# Human MS - 虚拟人唇形同步系统
+# Human MS - 面试智能语音与表情分析
+基于 **Redis 异步队列 + F5-TTS + FunASR + OpenCV + Dify 大模型** 构建的面试全流程智能服务系统，实现**语音合成、语音识别、表情反馈分析**三大异步核心能力，支持高并发、解耦架构、实时通知与结果缓存。
 
-基于 MuseTalk 和 F5-TTS 的实时高质量唇形同步虚拟人生成系统。
+---
 
-## 📖 项目简介
+## 一、项目简介
+本项目专为**线上面试场景**设计，通过三大异步服务模块完成面试全流程智能化处理：
+- 使用 **F5-TTS** 实现面试官语音自动生成，支持零样本音色克隆
+- 使用 **FunASR** 实现面试者语音实时转文字，自动静音过滤与标点补齐
+- 使用 **OpenCV + Dify** 实现面试视频表情、动作、状态智能分析
+整体基于 Redis 队列实现 Java 后端与 Python 服务异步解耦，具备高可用、高并发、自动化分析能力。
 
-本项目是一个集成语音合成（TTS）、语音识别（ASR）和唇形同步的虚拟人生成系统，支持多语言音频驱动，可实时生成高质量的唇形同步视频（30fps+）。
+---
 
-### 核心功能
+## 二、三大核心模块详解
 
-- **唇形同步**：基于潜空间修复技术的高质量唇形同步
-- **语音合成**：集成 F5-TTS 文本转语音引擎
-- **语音识别**：支持 ASR 语音转文字功能
-- **实时推理**：支持正常推理与实时推理两种模式
-- **多语言支持**：支持中英文等多语言音频驱动
-- **嘴型调节**：可调节嘴型开合度（bbox_shift）
+### 1. 异步语音合成（TTS）
+**技术栈**：Redis + F5-TTS
+- 程序启动后加载 F5-TTS 模型，连接 Redis 并通过 `blpop` 阻塞监听 TTS 任务队列
+- Java 端将任务 ID、用户 ID、文本内容推入队列
+- Python 消费端取出任务，调用模型生成语音文件
+- 音频地址存入 Redis 并设置过期时间，通过 **Redis 发布订阅**通知 Java 任务完成
+- 支持**结果缓存**，相同文本直接复用，避免重复推理
 
-### 应用场景
+**F5-TTS 说明**：
+开源 AI 语音克隆模型，输入**几秒参考音频 + 文本**，即可模仿对应音色、语调、语气生成高质量语音。
 
-- 虚拟人生成（配合 MuseV）
-- 视频配音
-- 直播互动
-- 数字人内容创作
+---
 
-## 🏗️ 项目结构
+### 2. 异步语音识别（ASR）
+**技术栈**：Redis + FunASR
+- 启动时加载阿里开源 **Paraformer-zh** 语音识别流水线
+- 通过 `blpop` 阻塞监听 ASR 任务队列
+- 接收 Java 发送的音频任务，执行**语音转文字**
+- 自动过滤静音、非人声，自动添加标点符号
+- 识别结果存入 Redis，通过发布订阅实时推送给 Java 端
 
+**FunASR 说明**：
+阿里全自动语音识别流水线，一键加载三模型协同工作：
+- `paraformer-zh`：核心语音转文字
+- `fsmn-vad`：静音/人声检测
+- `ct-punc-c`：智能标点预测
+支持 GPU 加速，速度快、准确率高，适合面试实时转写。
+
+---
+
+### 3. 面试表情反馈分析（BQFK）
+**技术栈**：Redis + OpenCV + Dify 大模型 + MySQL
+- 监听 Redis 表情分析任务队列
+- 获取面试视频地址、面试 ID、序号等信息
+- 使用 **OpenCV** 对视频**定时抽帧**，保存为图片
+- 将图片传入 **Dify 视觉大模型**分析表情、动作、状态
+- 分析结果与图片路径存入 **MySQL** 数据库
+- 任务结果写入 Redis，发布订阅通知 Java 完成
+
+**OpenCV 说明**：
+开源计算机视觉库，用于**视频读取、定时抽帧、图像保存**，为表情分析提供帧数据。
+
+---
+
+## 三、项目结构
 ```
-
 human_ms/
-├── F5-TTS/                 # F5-TTS 语音合成子模块
-│   ├── src/f5_tts/        # F5-TTS 核心代码
-│   │   ├── model/         # 模型定义
-│   │   ├── infer/         # 推理脚本
-│   │   ├── train/         # 训练脚本
-│   │   └── api.py         # API 接口
-│   └── ckpts/             # 预训练权重
-├── data/                   # 数据目录
-│   ├── audio/             # 音频资源
-│   └── video/             # 视频资源
-├── audios/                 # 音频输出目录
-├── tests/                  # 测试文件目录
-├── server.py              # Web 服务器主程序
-├── tts.py                 # 异步 TTS 消费服务
-├── asr.py                 # ASR 语音识别服务
-├── bqfk.py                # 翻译服务
-└── hey_tts.py             # TTS 调用示例
+├── .venv/                  # Python 虚拟环境
+├── audios/                 # TTS 生成音频输出目录
+├── data/                   # 素材目录（参考音频、视频等）
+├── develop/                # 开发调试脚本
+├── F5-TTS/                 # F5-TTS 语音合成模型子模块
+├── tests/                  # 临时文件（抽帧图片、测试文件）
+├── .gitignore              # Git 忽略配置
+├── asr.py                  # ASR 语音识别服务
+├── bqfk.py                 # 表情反馈分析服务
+├── config.py               # 全局配置（Redis/MySQL/Dify/路径）
+├── FFmpeg.md               # FFmpeg 配置说明
+├── hey_asr.py              # ASR 本地测试脚本
+├── hey_tts.py              # TTS 本地测试脚本
+├── output_audio.wav        # TTS 参考音色（克隆声音）
+├── README.md               # 项目说明文档
+├── server.py               # FastAPI 接口服务
+└── tts.py                  # TTS 语音合成服务
 ```
-### 数据流向
 
-- **输入素材**: `data/` 目录存放音频和视频输入素材
-- **临时文件**: `tests/` 目录存放临时生成的文件
-- **最终输出**: `results/` 目录存放输出的同步视频
-- **资源库**: `audios/` 目录存放音频资源
+---
 
-## 🔧 环境要求
+## 四、环境要求
+- Python >= 3.10
+- CUDA 11.7+（GPU 加速）
+- Redis：localhost:6379 密码：123456
+- MySQL：shuziren-mianshi
+- FFmpeg（音视频处理）
+- Dify API 密钥
 
-### 基本配置
+---
 
-- **Python**: >= 3.10
-- **CUDA**: 11.7
-- **GPU**: 推荐 NVIDIA V100 或更高性能显卡
-
-### 外部依赖
-
-- **Redis**: localhost:6379 (密码：123456)
-- **FFmpeg**: 需设置 `FFMPEG_PATH` 环境变量
-
-### 模型权重
-
-系统会自动下载以下模型权重至 `./models` 目录：
-
-- musetalk - 唇形同步模型
-- whisper - 语音识别模型
-- dwpose - 姿态估计模型
-- face-parse - 人脸解析模型
-
-## 🚀 快速开始
-
-### 1. 安装依赖
-
-```
-bash
-# 克隆项目
-git clone <repository-url>
-cd human_ms
-
-# 安装 F5-TTS 子模块
-cd F5-TTS
-pip install -e .
-
-# 返回根目录并安装主项目依赖
-cd ..
-pip install -r requirements.txt
-```
-### 2. 配置环境变量
-
-设置 FFmpeg 路径（Windows 示例）：
-
-```
-powershell
-$env:FFMPEG_PATH = "C:\path\to\ffmpeg"
-```
-### 3. 启动 Redis
-
-确保 Redis 服务在本地运行：
-
-```
-bash
-redis-server --requirepass 123456
-```
-### 4. 运行服务
-
-#### 方式一：Web 服务
-
-```
-bash
-python server.py
-```
-#### 方式二：TTS 服务
-
-```
-bash
-python tts.py
-```
-#### 方式三：ASR 服务
-
-```
-bash
-python asr.py
-```
-## 📝 使用说明
-
-### 基本使用流程
-
-1. **准备素材**：将视频和音频文件放入 `data/video/` 和 `data/audio/` 目录
-2. **启动服务**：运行相应的服务脚本
-3. **生成视频**：通过 API 或命令行工具生成唇形同步视频
-4. **查看结果**：生成的视频保存在 `results/` 目录
-
-### API 接口
-
-服务启动后，可通过 HTTP API 进行调用：
-
-```
-bash
-# TTS 文本转语音
-curl -X POST http://localhost:8000/tts \
-  -H "Content-Type: application/json" \
-  -d '{"text": "你好世界"}'
-
-# ASR 语音转文字
-curl -X POST http://localhost:8000/asr \
-  -F "audio=@audio.wav"
-
-# 唇形同步视频生成
-curl -X POST http://localhost:8000/generate \
-  -F "video=@input.mp4" \
-  -F "audio=@output_audio.wav"
-```
-### 参数调节
-
-可通过 `bbox_shift` 参数调节嘴型开合度：
-
-- 正值：增大嘴型开合度
-- 负值：减小嘴型开合度
-- 默认值：0
-
-## 🛠️ 开发指南
-
-### 核心模块
-
-- **MuseTalk** (`musetalk/`): 唇形同步模型定义
-- **推理脚本** (`scripts/`): 
-  - `inference.py` - 标准推理
-  - `realtime_inference.py` - 实时推理
-- **F5-TTS** (`F5-TTS/src/f5_tts/`): 语音合成引擎
-
-### 自定义模型
-
-如需使用自定义模型权重，可将权重文件放入 `models/` 目录并在配置文件中指定路径。
-
-### 性能优化
-
-- 使用 GPU 推理可获得最佳性能
-- 调整 batch_size 以平衡速度和质量
-- 实时模式下可降低分辨率以提升帧率
-
-## 📋 常见问题
-
-### Q: 如何修改嘴型开合度？
-
-A: 在调用推理脚本时传入 `bbox_shift` 参数：
-
-```
-python
-bbox_shift = 5  # 增大嘴型开合度
-```
-### Q: 推理速度慢怎么办？
-
-A: 尝试以下方法：
-- 降低视频分辨率
-- 使用实时推理模式
-- 升级 GPU 硬件
-
-### Q: 如何切换不同的 TTS 声音？
-
-A: 修改 TTS 配置文件中的说话人 ID 或使用不同的参考音频。
-
-## 📄 许可证
-
-本项目基于相关开源协议发布，请查看各子项目的具体 LICENSE 文件。
-
-## 🙏 致谢
-
-- [MuseTalk](https://github.com/TMElyralab/MuseTalk) - 唇形同步基础模型
-- [F5-TTS](https://github.com/SWivid/F5-TTS) - 语音合成引擎
-- [Whisper](https://github.com/openai/whisper) - 语音识别
-
-## 📞 联系方式
-
-如有问题或建议，欢迎提交 Issue 或联系开发者。
-```
+## 五、系统优势
+- 异步解耦：Java 不阻塞，支持高并发
+- 结果缓存：避免重复推理，提升性能
+- 实时通知：Redis 发布订阅，秒级通知
+- 全自动化：语音生成 → 语音转写 → 表情分析
+- 面试专用：适配线上面试评估与复盘

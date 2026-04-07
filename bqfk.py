@@ -6,87 +6,35 @@ import requests
 import json
 from config import DIFY_API_KEY_EXPRESSION_FEEDBACK, DIFY_API_URL
 
-# # Dify API 相关信息
-# 表情动作反馈 (改成自己的密钥，该密钥已经销毁)
+# Redis 配置与规范
+r = redis.Redis(host='localhost', port=6379, password='123456', decode_responses=True)
+QUEUE_BQFK = 'interview:queue:bqfk'
+TASK_STATUS = "interview:task:{taskId}:status"
+TASK_RESULT = "interview:task:{taskId}:result"
+CHANNEL_NOTIFY = "interview:channel:notify"
+
+# Dify API 相关信息
 DIFY_API_KEY = DIFY_API_KEY_EXPRESSION_FEEDBACK
-DIFY_API_URL_LOCAL = DIFY_API_URL
 # 本地文件nginx代理
 BASE_URL = "http://localhost:4000/tests/"
 # 容器内部访问外部的地址
 REMOTE_BASE_URL = "http://localhost:4000/tests/"
 TESTS_DIR = r"tests"
 
-r = redis.Redis(host='localhost', port=6379, password='123456')
-# 视频抽帧函数，抽成图片，并且交给dify进行ai分析
-def extract_frames(element, interval=100):
-    connection = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="123456",
-        database="shuziren-mianshi"
-    )
-    cursor = connection.cursor()
-    # 视频地址，msId，index
-    data = element.split("___")
-    # OpenCV 读取视频 / 摄像头, 视频地址
-    cap = cv2.VideoCapture(BASE_URL + data[0])
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    print(f"视频fps: {fps}")
-    if not fps or fps <= 0:
-        print(f"视频无法打开或FPS为0: {BASE_URL + data[0]}")
-        return
-    # fps：1s播放多少图片
-    # interval = 你想 多少秒抽一张图（比如 1 秒、2 秒）
-    # 目前是 100s 抽一张图片
-    frame_interval = max(1, int(fps * interval))
+# 数据库配置
+DB_CONFIG = {
+    "host": "localhost",
+    "user": "root",
+    "password": "123456",
+    "database": "shuziren-mianshi"
+}
 
-    print(f"每隔{interval} 秒抽一张图片")
-    frame_count = 0
-    folder_path = os.path.join(TESTS_DIR, data[0].replace('.mp4', ''))
-    os.makedirs(folder_path, exist_ok=True)
-    print(f"抽帧保存目录: {folder_path}")
-
-    while cap.isOpened():
-        # ret成功读取到了，frame为当前帧
-        ret, frame = cap.read()
-        if not ret:
-            break
-        # 采用间隔抽帧，第0帧一定会被抽出来
-        if frame_count % frame_interval == 0:
-            filename = f"{data[0].replace('.mp4', '')}/{frame_count}.jpg"
-            frame_filename = os.path.join(TESTS_DIR, filename)
-            print(f"抽帧图片地址：{frame_filename}")
-            # 图片写入本地磁盘
-            cv2.imwrite(frame_filename, frame)
-            # 图片地址
-            res = analyze_image(REMOTE_BASE_URL + filename)
-            print(f"分析结果：{res}") #res['score'] res['summary']
-            if "人物" not in str(res['summary']):
-                sql = "INSERT INTO b_mianshi_bq (ms_id, `index`, content, sort, url) VALUES (%s, %s, %s, %s, %s)"
-                values = (data[1], data[2], str(res['summary']), str(res['score']), filename)
-                cursor.execute(sql, values)
-                connection.commit()
-                print(cursor.rowcount, "条记录插入成功。")
-                break
-            # extracted_frames.append(frame_filename)
-        frame_count += 1
-
-    cap.release()
-
-    cursor.close()
-    connection.close()
-    # return extracted_frames
-
-
-
-# 调用 Dify API 解析图片
-def analyze_image(image_path):
+def analyze_image(image_url):
+    """调用 Dify API 解析图片"""
     headers = {
         "Authorization": f"Bearer {DIFY_API_KEY}",
         "Content-Type": "application/json"
     }
-    # with open(image_path, "rb") as f:
-        # 这里需要根据 Dify API 文档调整请求体
     payload = {
         "inputs": {},
         "query": "请分析人物的表情动作",
@@ -96,35 +44,105 @@ def analyze_image(image_path):
             {
                 "type": "image",
                 "transfer_method": "remote_url",
-                "url": image_path
+                "url": image_url
             }
         ]
     }
-    response = requests.post(DIFY_API_URL, headers=headers, json=payload)
-    if response.status_code == 200:
-        result = response.json()
-        return json.loads(result['answer'])
+    try:
+        response = requests.post(DIFY_API_URL, headers=headers, json=payload, timeout=30)
+        if response.status_code == 200:
+            result = response.json()
+            return json.loads(result['answer'])
+    except Exception as e:
+        print(f"[BQFK ERROR] Dify API 请求失败: {e}")
+    return None
 
-    else:
-        print(f"API 请求失败，状态码: {response.status_code}，错误信息: {response.text}")
-        return None
+def extract_and_analyze(task_id, user_id, element, interval=100):
+    """视频抽帧并分析"""
+    connection = mysql.connector.connect(**DB_CONFIG)
+    cursor = connection.cursor()
+    
+    # element 格式: videoUrl___msId___index
+    data = element.split("___")
+    video_filename = data[0]
+    ms_id = data[1]
+    index = data[2]
+
+    cap = cv2.VideoCapture(BASE_URL + video_filename)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if not fps or fps <= 0:
+        print(f"[BQFK ERROR] 视频无法打开: {BASE_URL + video_filename}")
+        return
+
+    frame_interval = max(1, int(fps * interval))
+    frame_count = 0
+    folder_path = os.path.join(TESTS_DIR, video_filename.replace('.mp4', ''))
+    os.makedirs(folder_path, exist_ok=True)
+
+    final_result = {"status": "NO_HUMAN_DETECTED"}
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        if frame_count % frame_interval == 0:
+            rel_filename = f"{video_filename.replace('.mp4', '')}/{frame_count}.jpg"
+            frame_filename = os.path.join(TESTS_DIR, rel_filename)
+            cv2.imwrite(frame_filename, frame)
+            
+            res = analyze_image(REMOTE_BASE_URL + rel_filename)
+            print(f"[BQFK] 抽帧分析结果: {res}")
+            
+            if res and "人物" not in str(res.get('summary', '')):
+                sql = "INSERT INTO b_mianshi_bq (ms_id, `index`, content, sort, url) VALUES (%s, %s, %s, %s, %s)"
+                values = (ms_id, index, str(res['summary']), str(res['score']), rel_filename)
+                cursor.execute(sql, values)
+                connection.commit()
+                final_result = res
+                break
+        frame_count += 1
+
+    cap.release()
+    cursor.close()
+    connection.close()
+
+    # 1. 更新任务状态为 DONE
+    r.setex(TASK_STATUS.format(taskId=task_id), 600, "DONE")
+
+    # 2. 存储结果到 Redis
+    r.setex(TASK_RESULT.format(taskId=task_id), 600, json.dumps(final_result))
+
+    # 3. 发布通知 (Java 端会根据类型过滤，静默入库)
+    notify_data = {
+        "userId": user_id,
+        "taskId": task_id,
+        "type": "BQFK",
+        "result": final_result
+    }
+    r.publish(CHANNEL_NOTIFY, json.dumps(notify_data))
+    print(f"[BQFK] 任务 {task_id} 处理完毕")
+
+print(f"[BQFK Worker] 启动，正在监听队列: {QUEUE_BQFK}")
 
 while True:
-    queue_result = r.blpop('bqfkqueue1', timeout=0)
-    element = ""
-    if queue_result:
-         # 因为blpop返回的是一个包含键名和值的元组，所以取第二个元素为实际数据
-        element = str(queue_result[1].decode('utf-8'))
-        print(f"从队列中取出元素: {element}")
-    else:
-        print("队列为空，继续等待...")
-        continue
     try:
-        extract_frames(element)
+        queue_result = r.blpop(QUEUE_BQFK, timeout=0)
+        if not queue_result:
+            continue
+            
+        task_json = queue_result[1]
+        task_data = json.loads(task_json)
+        task_id = task_data.get("taskId")
+        user_id = task_data.get("userId")
+        element = task_data.get("data") # videoUrl___msId___index
+
+        print(f"[BQFK] 收到任务 {task_id}, 用户 {user_id}")
+        extract_and_analyze(task_id, user_id, element)
+
     except Exception as e:
-        print("错误", e)
+        print(f"[BQFK ERROR] 循环异常: {e}")
         import traceback
         traceback.print_exc()
-    #print(result)
-    #r.set(element, result)
-
+        import time
+        time.sleep(1)
